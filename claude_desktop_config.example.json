@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "litserve-minimal": {
+      "command": "python",
+      "args": [
+        "examples/server_minimal_mcp.py"
+      ]
+    },
+    "litserve-bridge": {
+      "command": "python",
+      "args": [
+        "examples/mcp_bridge.py"
+      ]
+    }
+  }
+}

@@ -1,0 +1,7 @@
+litserve
+requests
+httpx
+openai>=1.0.0
+langchain
+chromadb
+sentence-transformers

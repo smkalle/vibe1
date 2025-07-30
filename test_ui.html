@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LitServe MCP Test Harness</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .response {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status.online {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LitServe MCP Test Harness</h1>
+        <p>Test various endpoints and operations with sample data</p>
+        
+        <h2>Server Status</h2>
+        <div>
+            <strong>Minimal Server (8000):</strong> <span id="status-8000" class="status offline">Offline</span>
+            <button onclick="checkServer('8000')">Check Status</button>
+        </div>
+        <div>
+            <strong>RAG Server (8001):</strong> <span id="status-8001" class="status offline">Offline</span>
+            <button onclick="checkServer('8001')">Check Status</button>
+        </div>
+        <div>
+            <strong>UI Test Server (8002):</strong> <span id="status-8002" class="status offline">Offline</span>
+            <button onclick="checkServer('8002')">Check Status</button>
+        </div>
+        <button onclick="checkAllServers()">Check All Servers</button>
+    </div>
+
+    <div class="container">
+        <h2>Quick Tests</h2>
+        
+        <div class="test-section">
+            <h3>Minimal Server Tests (Port 8000)</h3>
+            <button onclick="testMinimal(4)">Test Square of 4</button>
+            <button onclick="testMinimal(10)">Test Square of 10</button>
+            <button onclick="testMinimal(-3)">Test Square of -3</button>
+            <div id="minimal-response" class="response" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>UI Test Server (Port 8002)</h3>
+            <button onclick="testUI('math', 7)">Math: Square of 7</button>
+            <button onclick="testUI('text', 'hello world')">Text: Uppercase</button>
+            <button onclick="testUI('json', {name: 'test', value: 'data'})">JSON: Process Object</button>
+            <button onclick="testUI('test_cases', null)">Get Test Cases</button>
+            <div id="ui-response" class="response" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>RAG Server Tests (Port 8001)</h3>
+            <p><em>Note: Requires OPENAI_API_KEY environment variable</em></p>
+            <button onclick="testRAG('What is machine learning?')">Test ML Query</button>
+            <button onclick="testRAG('Explain neural networks')">Test Neural Networks</button>
+            <div id="rag-response" class="response" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Custom Tests</h2>
+        
+        <div class="test-section">
+            <h3>Custom Request Builder</h3>
+            <label>Server Port:</label>
+            <select id="custom-port">
+                <option value="8000">8000 (Minimal)</option>
+                <option value="8001">8001 (RAG)</option>
+                <option value="8002">8002 (UI Test)</option>
+            </select>
+            
+            <label>Request Body (JSON):</label>
+            <textarea id="custom-body" rows="6" placeholder='{"input": 5}'></textarea>
+            
+            <button onclick="sendCustomRequest()">Send Request</button>
+            <div id="custom-response" class="response" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        async function checkServer(port) {
+            const statusElement = document.getElementById(`status-${port}`);
+            try {
+                const response = await fetch(`http://localhost:${port}/health`, {method: 'GET'});
+                if (response.ok) {
+                    statusElement.textContent = 'Online';
+                    statusElement.className = 'status online';
+                } else {
+                    throw new Error('Server responded with error');
+                }
+            } catch (error) {
+                statusElement.textContent = 'Offline';
+                statusElement.className = 'status offline';
+            }
+        }
+
+        async function checkAllServers() {
+            await checkServer('8000');
+            await checkServer('8001');
+            await checkServer('8002');
+        }
+
+        async function testMinimal(input) {
+            const responseDiv = document.getElementById('minimal-response');
+            responseDiv.style.display = 'block';
+            responseDiv.textContent = 'Testing...';
+            responseDiv.className = 'response';
+
+            try {
+                const response = await fetch('http://localhost:8000/predict', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({input: input})
+                });
+                
+                const data = await response.json();
+                responseDiv.textContent = `Input: ${input}\nResponse: ${JSON.stringify(data, null, 2)}`;
+                responseDiv.className = 'response success';
+            } catch (error) {
+                responseDiv.textContent = `Error: ${error.message}`;
+                responseDiv.className = 'response error';
+            }
+        }
+
+        async function testUI(operation, data) {
+            const responseDiv = document.getElementById('ui-response');
+            responseDiv.style.display = 'block';
+            responseDiv.textContent = 'Testing...';
+            responseDiv.className = 'response';
+
+            try {
+                const payload = {operation: operation};
+                if (data !== null) payload.data = data;
+
+                const response = await fetch('http://localhost:8002/predict', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                responseDiv.textContent = `Operation: ${operation}\nInput: ${JSON.stringify(data)}\nResponse: ${JSON.stringify(result, null, 2)}`;
+                responseDiv.className = 'response success';
+            } catch (error) {
+                responseDiv.textContent = `Error: ${error.message}`;
+                responseDiv.className = 'response error';
+            }
+        }
+
+        async function testRAG(query) {
+            const responseDiv = document.getElementById('rag-response');
+            responseDiv.style.display = 'block';
+            responseDiv.textContent = 'Testing...';
+            responseDiv.className = 'response';
+
+            try {
+                const response = await fetch('http://localhost:8001/predict', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({query: query, top_k: 3})
+                });
+                
+                const data = await response.json();
+                responseDiv.textContent = `Query: ${query}\nResponse: ${JSON.stringify(data, null, 2)}`;
+                responseDiv.className = 'response success';
+            } catch (error) {
+                responseDiv.textContent = `Error: ${error.message}\n\nNote: RAG server requires OPENAI_API_KEY environment variable`;
+                responseDiv.className = 'response error';
+            }
+        }
+
+        async function sendCustomRequest() {
+            const port = document.getElementById('custom-port').value;
+            const body = document.getElementById('custom-body').value;
+            const responseDiv = document.getElementById('custom-response');
+            
+            responseDiv.style.display = 'block';
+            responseDiv.textContent = 'Sending request...';
+            responseDiv.className = 'response';
+
+            try {
+                const response = await fetch(`http://localhost:${port}/predict`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: body
+                });
+                
+                const data = await response.json();
+                responseDiv.textContent = `Request to port ${port}:\n${body}\n\nResponse:\n${JSON.stringify(data, null, 2)}`;
+                responseDiv.className = 'response success';
+            } catch (error) {
+                responseDiv.textContent = `Error: ${error.message}`;
+                responseDiv.className = 'response error';
+            }
+        }
+
+        // Check server status on page load
+        window.onload = function() {
+            checkAllServers();
+        };
+    </script>
+</body>
+</html>

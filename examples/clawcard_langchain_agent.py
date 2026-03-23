@@ -338,7 +338,7 @@ def main():
         print(
             "Error: OPENAI_API_KEY environment variable is not set.\n"
             "Export it before running:\n"
-            "  export OPENAI_API_KEY=sk-...",
+            "  export OPENAI_API_KEY=<your-openai-key>",
             file=sys.stderr,
         )
         sys.exit(1)

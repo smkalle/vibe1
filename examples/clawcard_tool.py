@@ -12,7 +12,7 @@ Usage:
     info   = agent.info()                        # email, phone, wallet, budget
     emails = agent.emails(unread=True)           # check inbox
     card   = agent.cards_create(amount_cents=2000, card_type="single_use")
-    creds  = agent.creds_set("stripe", "secret_key", "sk_live_...")
+    creds  = agent.creds_set("stripe", "secret_key", "<your-stripe-key>")
     bal    = agent.wallet_balance()
     pay    = agent.wallet_send("https://api.example.com/premium", protocol="x402")
 """

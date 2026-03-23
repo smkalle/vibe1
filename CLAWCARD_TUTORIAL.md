@@ -103,7 +103,7 @@ clawcard keys create --name "litserve-tutorial-agent"
 ```json
 {
   "name": "litserve-tutorial-agent",
-  "apiKey": "ak_live_...",
+  "apiKey": "ak_EXAMPLE_replace_with_real_key",
   "email": "inbox-7xk@mail.clawcard.sh",
   "phone": "+12025551234",
   "walletBase": "0xabc...def",
@@ -116,10 +116,10 @@ Store the raw API key immediately:
 
 ```bash
 # Option A — Google Secret Manager (production)
-gcloud secrets create clawcard-agent-key --data-file=<(echo "ak_live_...")
+gcloud secrets create clawcard-agent-key --data-file=<(echo "ak_EXAMPLE_replace_with_real_key")
 
 # Option B — local .env (development, gitignored)
-echo "CLAWCARD_AGENT_KEY=ak_live_..." >> .env
+echo "CLAWCARD_AGENT_KEY=ak_EXAMPLE_replace_with_real_key" >> .env
 ```
 
 Optionally pre-allocate a card budget:
@@ -202,7 +202,7 @@ clawcard agent cards freeze <card_id> --json
 
 ```bash
 # Store (AES-256 encrypted)
-clawcard agent creds set --service stripe --key secret_key --value "sk_live_..." --json
+clawcard agent creds set --service stripe --key secret_key --value "<your-stripe-key>" --json
 
 # Retrieve
 clawcard agent creds get --service stripe --key secret_key --json
@@ -574,7 +574,7 @@ The wallet handles the full payment handshake transparently.
 ```bash
 curl -s -X POST localhost:8003/predict \
   -H "content-type: application/json" \
-  -d '{"action": "creds_set", "service": "someservice", "key": "api_key", "value": "sk_live_abc123"}'
+  -d '{"action": "creds_set", "service": "someservice", "key": "api_key", "value": "<your-api-key>"}'
 
 curl -s -X POST localhost:8003/predict \
   -H "content-type: application/json" \
@@ -587,7 +587,7 @@ On the next agent restart:
 curl -s -X POST localhost:8003/predict \
   -H "content-type: application/json" \
   -d '{"action": "creds_get", "service": "someservice", "key": "api_key"}'
-# → { "value": "sk_live_abc123" }
+# → { "value": "<your-api-key>" }
 ```
 
 ### 7.7 Audit everything
@@ -660,7 +660,7 @@ As an SDE3, these are non-negotiable:
 **If an agent goes rogue:**
 
 ```bash
-clawcard keys revoke ak_live_...
+clawcard keys revoke ak_EXAMPLE_replace_with_real_key
 # → All resources (email, phone, cards, wallet) instantly deactivated
 ```
 

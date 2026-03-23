@@ -33,7 +33,7 @@ Test:
     # Store a credential
     curl -s -X POST localhost:8003/predict \
       -H "content-type: application/json" \
-      -d '{"action": "creds_set", "service": "stripe", "key": "secret_key", "value": "sk_test_..."}'
+      -d '{"action": "creds_set", "service": "stripe", "key": "secret_key", "value": "<your-stripe-key>"}'
 
     # Gasless x402 payment
     curl -s -X POST localhost:8003/predict \

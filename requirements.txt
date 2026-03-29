@@ -5,3 +5,7 @@ openai>=1.0.0
 langchain
 chromadb
 sentence-transformers
+# bookmarks graph
+typer[all]
+networkx
+python-louvain

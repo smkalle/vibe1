@@ -345,3 +345,7 @@ A report from a real Omarchy desktop showed the screensaver rendering entirely i
 - **Default now:** `palette = "theme"` falls back to the Matrix green when the accent's chroma is below 0.03. Warm neutrals such as kanagawa and last-horizon still follow their theme.
 - **Keeping the grey look:** `palette = "theme-strict"`.
 - **Diagnosis:** `flysaver doctor` prints which palette was chosen and why.
+
+### Live brain (Phase 1)
+
+Specified and measured in [flysaver-live-brain.md](flysaver-live-brain.md). This supersedes Q6 ("skip the real simulation"): the default is now the live rate model, with `brain = "decorative"` as the lighter option.

@@ -8,9 +8,11 @@ mod fb;
 mod hypr;
 mod install;
 mod math;
+mod neuro;
 mod raster;
 mod rng;
 mod scene;
+mod senses;
 mod sim;
 mod term;
 mod theme;
@@ -51,12 +53,21 @@ After \"A fly in the Matrix\" by Bernhard Mueller / Pragma Research, a Cadence
 example: https://floatingpragma.io/cadence-examples/fly-matrix/
 (source: github.com/Jarikononen/cadence-examples, MIT licence).
 
-The neuron positions are a 20,044-neuron sample of BANC release 888
-(adult female Drosophila brain and nerve cord, 150,802 neurons),
-by the Lee lab and the BANC community, CC BY 4.0.
+The connectome is BANC release 888 (adult female Drosophila brain and
+nerve cord, 150,802 neurons), by the Lee lab and the BANC community,
+CC BY 4.0. The silhouette is a 20,044-neuron sample of it.
 
-The fly's behaviour and the neural firing shown here are procedural and
-decorative. No connectome is simulated.
+What is simulated (brain = \"live\", the default): the 60,000-neuron sub-net
+that \"A fly in the Matrix\" settles, 1,209,528 synapse classes wired as
+measured, running the Cadence graded rate model with the library's numbers
+(held to cadence.Brain's own outputs to 1e-9 by the parity test). The drawn
+activity is that model's.
+
+What is supplied: the fly's behaviour (flight bouts, saccades, landing,
+grooming, feeding) is procedural, and its senses are fed to the brain as the
+original page feeds them (halteres, ocelli, optic flow, antennae, odours,
+sugar, touch). The landing surface stands in for the original's swatting
+hand as the looming stimulus. The brain watches; it does not yet fly.
 ";
 
 struct Opts {
@@ -194,6 +205,7 @@ pub fn snapshot(cfg: Config, seed: u64, (cols, rows): (usize, usize), secs: f32,
     let colors = if html { cfg.colors.resolve_env() } else { Colors::TrueColor };
     let theme = if html { Theme::load(cfg.palette) } else { Theme::matrix() };
     let mut scene = Scene::new(cfg, theme, seed);
+    scene.show_timing = false;
     let mut f = Frame::new(cols, rows).with_colors(colors);
     let dt = 1.0 / 30.0;
     for _ in 0..(secs / dt) as usize {

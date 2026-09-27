@@ -7,8 +7,11 @@ drawn in truecolor text and braille. The scene has four parts:
 - Matrix digital rain
 - a green wireframe room with a table, a banana and a piece of bread
 - a wireframe fruit fly that flies bouts, makes saccades, lands, grooms and feeds
-- the fly's real nervous system as a turning hologram: 20,044 neurons sampled
-  from the 150,802 in the BANC connectome, each drawn where it sits
+- the fly's real nervous system as a turning hologram, **running live**. The
+  60,000-neuron BANC sub-net that the original simulates, with 1.2 million
+  synapse classes wired as measured, runs the Cadence rate model every frame.
+  The fly's senses feed its sensory neurons, and every active neuron lights up
+  where it sits. Numerically, it matches the Cadence library to 3e-16.
 
 ![The nervous system view](screenshots/brain.png)
 ![Following the fly](screenshots/follow.png)
@@ -67,7 +70,7 @@ flysaver doctor     # check the setup
 
 | File | Purpose |
 |---|---|
-| `~/.local/bin/flysaver` | the binary: about 750 KB, static apart from libc, with the connectome embedded |
+| `~/.local/bin/flysaver` | the binary: about 5 MB, static apart from libc, with the brain and connectome embedded |
 | `~/.local/share/flysaver/bin/omarchy-screensaver` | a shim that runs flysaver, or falls back to the stock screensaver |
 | `~/.config/uwsm/env.d/99-flysaver` | puts the shim first on the Hyprland session's `PATH` |
 | `~/.local/share/flysaver/flysaver-launch` | `flysaver launch`: Omarchy's launcher, pointed at flysaver |
@@ -102,6 +105,9 @@ first-class hook.
 | `camera` | `"cycle"` | `follow`, `room`, `brain`, or `cycle` through them every 30–60 s |
 | `palette` | `"theme"` | the current Omarchy theme; themes whose accent is grey (vantablack, white, solitude) get the original's `#39ff6a` instead. `"theme-strict"` follows even a grey theme; `"matrix"` always uses the green |
 | `colors` | `"auto"` | `"truecolor"`, `"256"`, or `auto`: truecolor when `COLORTERM` is `truecolor`/`24bit`, else 256 |
+| `brain` | `"live"` | the real rate model, or `"decorative"` for the lighter region pulses (about 2% of a core instead of about 6.5%) |
+| `brain_steps` | `1` | model steps per frame, 1–4 |
+| `vivid` | `true` | stronger, brighter colour: OKLab chroma ×1.8 with a lightness floor, and higher brightness floors. `false` restores the flatter look |
 | `glitch` | `true` | the occasional stutter and jitter |
 | `hud` | `true` | title, status line, credits |
 
@@ -124,38 +130,87 @@ that lack 24-bit colour, and it also cuts output by about a third.
 
 ![truecolor and 256 colours side by side](screenshots/truecolor-vs-256.png)
 
+## The live brain
+
+The brain is the sub-net that *A fly in the Matrix* settles: 60,000 of the
+150,802 BANC neurons, recruited from the flight, looming, odour, taste and
+mushroom-body populations.
+
+- **The model:** every frame, flysaver runs one step of the Cadence graded rate
+  model on it (`src/neuro.rs`).
+- **Exactness:** the weights are rebuilt from the synapse counts, signs and
+  cell-class gains exactly as the library composes them. They match the
+  original's f64 weights bit for bit, which `flysaver doctor` checks.
+- **Parity:** the step reproduces `cadence.Brain`'s own recorded outputs
+  (`tests/parity_cases.txt`) to 3e-16.
+
+**The senses** (`src/senses.rs`) feed it the way the original page does:
+
+| Neurons | Driven by |
+|---|---|
+| Halteres | a flight tone while flying |
+| Ocelli | the sky, from the body's orientation |
+| HS/VS optic-flow cells | turning (saccades drive them hard) |
+| Antennae | airspeed |
+| Odour receptors | a plume from the banana and the bread |
+| Sugar taste | feeding |
+| Leg touch | standing |
+| Dopamine | reward |
+
+This room has no swatting hand, so the looming detectors see the landing
+surface grow during the final approach.
+
+**What you can see** in the model (not scripted):
+- A saccade reaches the wing steering motor neurons.
+- A smell travels receptors → projection neurons → a sparse Kenyon-cell code
+  → the mushroom body's memory output neurons.
+
+Both are tested (`src/senses.rs`, `through_the_wiring`).
+
+**What's still supplied:** the fly's behaviour is procedural. The brain
+watches, but it doesn't fly yet. That's the roadmap's Phase 2.
+
 ## Performance
 
 These numbers come from `flysaver bench --size 230x65`, which is about a
 2560×1440 screen at Omarchy's screensaver font size.
 
-| | truecolor | 256 colours |
+| | live brain (default) | decorative brain |
 |---|---|---|
-| CPU per frame | 0.9–1.0 ms (2.7–3.1% of one core at 30 fps) | 1.05–1.1 ms (3.2–3.4%) |
-| Output to the terminal | 0.40–0.60 MB/s | 0.25–0.41 MB/s |
+| CPU per frame | 2.1–2.2 ms (6.3–6.6% of one core at 30 fps) | 0.6–0.65 ms (1.8–2.0%) |
+| Output to the terminal (truecolor) | 0.48–0.58 MB/s | 0.42–0.61 MB/s |
+| Peak memory | 50.5 MB | smaller (the brain isn't loaded) |
+| Start to first frame | about 110 ms (load, then 40 warm-up steps) | faster |
 | Exit | under 2 ms after a key or mouse movement; about 45 ms after focus leaves | same |
 
-Only changed cells are written, in one synchronized update per frame. The
-256-colour column costs a little more CPU for the palette lookups (which are
-cached), and it writes shorter colour codes that change less often.
+**Why a step is fast:** a model step costs about 1.1–1.6 ms. The sums are
+pushed from active neurons only. Silent neurons are exactly zero, and senders
+are visited in the same order the library adds them, so the result is
+bit-identical to summing over all 1.2 million synapse classes.
+
+**Other costs:** only changed cells are written, in one synchronized update
+per frame. 256-colour mode writes about a third less, for a little more CPU.
 
 ## How it works
 
 | File | Role |
 |---|---|
 | `src/sim.rs` | The fly's life as a state machine: fly, approach a smell, land, sit, groom, feed, take off. Rates follow the original's ethogram (about 0.45 saccades per second of flight, 5–15 s bouts). Also the camera director. |
-| `src/scene/` | One module per layer. `brain.rs` lights regions to match what the fly is doing: saccades light the optic lobes, take-off lights the wing motor neurons and descending neurons, feeding lights the antennae. A wave also runs from the brain down the nerve cord. |
+| `src/neuro.rs` | The Cadence rate model on the 60,000-neuron sub-net, ported from the original's `web/brain.js`. |
+| `src/senses.rs` | The fly's state mapped onto its afferents, ported from the original's `web/senses.js` and `web/life.js`. |
+| `src/scene/` | One module per layer. `brain.rs` draws the whole-brain silhouette and, in live mode, every active neuron on a heat ramp. In decorative mode it pulses regions instead. |
 | `src/raster.rs`, `src/fb.rs` | Perspective projection and lines drawn into braille dots (2×4 per cell). The layers are composed into cells and written to the terminal as a diff. |
 | `src/term.rs`, `src/hypr.rs` | Raw mode, mouse-motion reporting, signals, Hyprland pointer and focus handling, and the close-every-monitor exit. |
-| `tools/build_connectome.py` | Builds `assets/connectome.bin` (140 KB) from the original's `atlas.json`. |
+| `tools/build_brain.py` | Builds `assets/brain.bin` (4.2 MB) from the original's `brain.json` and `atlas.json`: delta-varint senders, counts and 2-bit signs, and it checks that every weight rebuilds exactly. |
+| `tools/build_connectome.py` | Builds `assets/connectome.bin` (140 KB), the silhouette sample. |
+| `tools/convert_parity.py` | Turns the library's `parity_cases.json` into `tests/parity_cases.txt`. |
 
-Nothing is simulated neurally. The firing is decorative, as `flysaver about`
-says.
+`flysaver about` spells out what is simulated and what is supplied.
 
 ## Tests
 
 ```bash
-cargo test --release                       # unit tests + golden frames
+cargo test --release                       # unit tests, golden frames, parity with the Cadence library
 python3 tests/pty_lifecycle.py             # exits and terminal restore in a real pty
 python3 tests/hypr_contract.py             # focus-loss exit, pointer, close-all, against a fake Hyprland
 tests/install_roundtrip.sh                 # install, shim, fallback, uninstall in a scratch $HOME
@@ -170,10 +225,14 @@ After an intentional visual change, regenerate the golden frames with
 - After *A fly in the Matrix* by Bernhard Mueller / Pragma Research, a
   [Cadence](https://floatingpragma.io/cadence/) example. The source is
   [github.com/Jarikononen/cadence-examples](https://github.com/Jarikononen/cadence-examples)
-  under the MIT licence. No code was copied. The scene, the palette and the
-  behaviour rates follow it.
-- The neuron positions come from BANC release 888 (adult female *Drosophila*
-  brain and nerve cord), by the Lee lab and the BANC community, CC BY 4.0.
-  They were sampled from the atlas that ships with the example above.
+  under the MIT licence
+  ([notice](NOTICE-cadence-examples.txt)). `src/neuro.rs` and `src/senses.rs`
+  are ports of its `web/brain.js`, `web/senses.js` and `web/life.js`, and
+  `tests/parity_cases.txt` is its `tests/parity_cases.json`. The scene, the
+  palette and the behaviour rates follow it.
+- The neurons, their positions and their wiring come from BANC release 888
+  (adult female *Drosophila* brain and nerve cord), by the Lee lab and the
+  BANC community, CC BY 4.0. They were taken from the atlas and sub-net that
+  ship with the example above.
 - The launcher script follows Omarchy's `omarchy-launch-screensaver`
   (Omarchy, MIT).

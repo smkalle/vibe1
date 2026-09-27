@@ -18,6 +18,19 @@ fn spaced(s: &str) -> String {
     out
 }
 
+/// 60000 -> "60,000".
+fn group(n: usize) -> String {
+    let s = n.to_string();
+    let mut out = String::new();
+    for (i, ch) in s.chars().enumerate() {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(ch);
+    }
+    out
+}
+
 fn fit(s: &str, max: usize) -> String {
     if s.chars().count() <= max {
         s.to_string()
@@ -26,7 +39,14 @@ fn fit(s: &str, max: usize) -> String {
     }
 }
 
+pub struct LiveInfo {
+    pub neurons: usize,
+    pub active: usize,
+    pub ms_per_step: Option<f32>,
+}
+
 pub struct HudInfo<'a> {
+    pub live: Option<LiveInfo>,
     pub fly: &'a Fly,
     pub camera: &'a str,
     pub neurons_drawn: usize,
@@ -57,7 +77,18 @@ pub fn draw(f: &mut Frame, theme: &Theme, info: &HudInfo) {
     }
     let row = f.rows as i32 - 4;
     f.text(2, row, &fit(&status, w - 4), theme.title);
-    let mut second = if info.neurons_drawn > 0 { format!("{} of 150,802 neurons drawn · ", info.neurons_drawn) } else { String::new() };
+    let mut second = match &info.live {
+        Some(l) => {
+            let mut s = format!("brain live · {} neurons settling · {} active", group(l.neurons), l.active);
+            if let Some(ms) = l.ms_per_step {
+                s.push_str(&format!(" · {ms:.1} ms/step"));
+            }
+            s.push_str(" · ");
+            s
+        }
+        None if info.neurons_drawn > 0 => format!("{} of 150,802 neurons drawn · ", info.neurons_drawn),
+        None => String::new(),
+    };
     second.push_str(&format!("camera {}", info.camera));
     if !recent.is_empty() {
         second.push_str(&format!(" · {}", recent.join(" · ")));
@@ -113,6 +144,13 @@ mod tests {
     fn fit_truncates_with_ellipsis() {
         assert_eq!(fit("abcdef", 4), "abc…");
         assert_eq!(fit("abc", 4), "abc");
+    }
+
+    #[test]
+    fn groups_thousands() {
+        assert_eq!(group(60000), "60,000");
+        assert_eq!(group(150802), "150,802");
+        assert_eq!(group(12), "12");
     }
 
     #[test]

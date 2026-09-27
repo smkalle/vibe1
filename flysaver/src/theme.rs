@@ -51,6 +51,78 @@ impl Rgb {
     }
 }
 
+/// OKLab, a perceptual colour space: lightness plus two opponent axes.
+pub mod oklab {
+    use super::Rgb;
+
+    pub fn from_rgb(c: Rgb) -> (f32, f32, f32) {
+        let lin = |v: u8| {
+            let v = v as f32 / 255.0;
+            if v <= 0.04045 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
+        };
+        let (r, g, b) = (lin(c.0), lin(c.1), lin(c.2));
+        let l = (0.412_221_46 * r + 0.536_332_55 * g + 0.051_445_995 * b).cbrt();
+        let m = (0.211_903_5 * r + 0.680_699_5 * g + 0.107_396_96 * b).cbrt();
+        let s = (0.088_302_46 * r + 0.281_718_85 * g + 0.629_978_7 * b).cbrt();
+        (
+            0.210_454_26 * l + 0.793_617_8 * m - 0.004_072_047 * s,
+            1.977_998_5 * l - 2.428_592_2 * m + 0.450_593_7 * s,
+            0.025_904_037 * l + 0.782_771_77 * m - 0.808_675_77 * s,
+        )
+    }
+
+    /// Back to sRGB, or None when the colour is outside what a screen can show.
+    pub fn to_rgb(l: f32, a: f32, b: f32) -> Option<Rgb> {
+        let l_ = (l + 0.396_337_78 * a + 0.215_803_76 * b).powi(3);
+        let m_ = (l - 0.105_561_346 * a - 0.063_854_17 * b).powi(3);
+        let s_ = (l - 0.089_484_18 * a - 1.291_485_5 * b).powi(3);
+        let r = 4.076_741_7 * l_ - 3.307_711_6 * m_ + 0.230_969_94 * s_;
+        let g = -1.268_438 * l_ + 2.609_757_4 * m_ - 0.341_319_38 * s_;
+        let bl = -0.004_196_086_3 * l_ - 0.703_418_6 * m_ + 1.707_614_7 * s_;
+        let enc = |v: f32| -> Option<u8> {
+            if !(-1e-4..=1.0001).contains(&v) {
+                return None;
+            }
+            let v = v.clamp(0.0, 1.0);
+            let e = if v <= 0.003_130_8 { 12.92 * v } else { 1.055 * v.powf(1.0 / 2.4) - 0.055 };
+            Some((e * 255.0).round().clamp(0.0, 255.0) as u8)
+        };
+        Some(Rgb(enc(r)?, enc(g)?, enc(bl)?))
+    }
+
+    /// Raise OKLab lightness to at least `min_l`, keeping hue and chroma where possible.
+    pub fn lighten(c: Rgb, min_l: f32) -> Rgb {
+        let (l, a, b) = from_rgb(c);
+        if l >= min_l {
+            return c;
+        }
+        // Lighter colours hold less chroma; shrink it until the colour fits.
+        let mut k = 1.0f32;
+        for _ in 0..20 {
+            if let Some(out) = to_rgb(min_l, a * k, b * k) {
+                return out;
+            }
+            k *= 0.85;
+        }
+        c
+    }
+
+    /// Scale a colour's chroma by `k`, keeping lightness and hue, backing off to
+    /// the most saturated version a screen can show.
+    pub fn saturate(c: Rgb, k: f32) -> Rgb {
+        let (l, a, b) = from_rgb(c);
+        let (mut lo, mut hi) = (1.0f32, k.max(1.0));
+        if let Some(out) = to_rgb(l, a * hi, b * hi) {
+            return out;
+        }
+        for _ in 0..16 {
+            let mid = (lo + hi) * 0.5;
+            if to_rgb(l, a * mid, b * mid).is_some() { lo = mid } else { hi = mid }
+        }
+        to_rgb(l, a * lo, b * lo).unwrap_or(c)
+    }
+}
+
 /// The xterm 256-colour palette above the 16 terminal colours: a 6x6x6 cube
 /// (16-231) and a 24-step grey ramp (232-255). Indices 0-15 are left alone:
 /// terminals (and Omarchy themes) redefine them.
@@ -85,18 +157,8 @@ pub mod xterm {
     pub(super) struct Lch(pub f32, pub f32, pub f32);
 
     pub(super) fn lch(c: Rgb) -> Lch {
-        let lin = |v: u8| {
-            let v = v as f32 / 255.0;
-            if v <= 0.04045 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
-        };
-        let (r, g, b) = (lin(c.0), lin(c.1), lin(c.2));
-        let l = (0.412_221_46 * r + 0.536_332_55 * g + 0.051_445_995 * b).cbrt();
-        let m = (0.211_903_5 * r + 0.680_699_5 * g + 0.107_396_96 * b).cbrt();
-        let s = (0.088_302_46 * r + 0.281_718_85 * g + 0.629_978_7 * b).cbrt();
-        let ll = 0.210_454_26 * l + 0.793_617_8 * m - 0.004_072_047 * s;
-        let a = 1.977_998_5 * l - 2.428_592_2 * m + 0.450_593_7 * s;
-        let bb = 0.025_904_037 * l + 0.782_771_77 * m - 0.808_675_77 * s;
-        Lch(ll, a.hypot(bb), bb.atan2(a))
+        let (l, a, b) = super::oklab::from_rgb(c);
+        Lch(l, a.hypot(b), b.atan2(a))
     }
 
     fn palette() -> &'static [(u8, Lch)] {
@@ -210,6 +272,33 @@ impl Theme {
         }
     }
 
+    /// Firing colour for activity in [0, 1]: the theme's hue, through the fire
+    /// colour, to white-hot at full activation.
+    pub fn heat(&self, act: f32) -> Rgb {
+        let a = act.clamp(0.0, 1.0);
+        if a < 0.5 {
+            self.wire.mix(self.fire, a * 2.0)
+        } else {
+            self.fire.mix(self.fire.mix(Rgb(255, 255, 255), 0.75), (a - 0.5) * 2.0)
+        }
+    }
+
+    /// Vivid roles: OKLab chroma x1.8 and a lightness floor, so even muted theme
+    /// accents glow on black; hue is kept and the result stays inside the gamut.
+    pub fn vivid(self) -> Theme {
+        let v = |c: Rgb| oklab::saturate(oklab::lighten(c, 0.72), 1.8);
+        Theme {
+            rain: v(self.rain),
+            rain_head: oklab::saturate(self.rain_head, 1.3),
+            wire: v(self.wire),
+            fire: v(self.fire),
+            fly: oklab::saturate(self.fly, 1.3),
+            hud: oklab::saturate(oklab::lighten(self.hud, 0.6), 1.8),
+            title: v(self.title),
+            ..self
+        }
+    }
+
     pub fn load(p: Palette) -> Theme {
         if p == Palette::Matrix {
             return Theme::matrix();
@@ -312,6 +401,37 @@ mod tests {
         // theme-strict keeps the grey.
         let t = Theme::from_colors_toml("accent = \"#8d8d8d\"\n", true);
         assert_eq!(t.rain.chroma() < GREY_ACCENT, true);
+    }
+
+    #[test]
+    fn oklab_round_trips() {
+        for c in [Rgb(0x39, 0xff, 0x6a), Rgb(0, 0, 0), Rgb(255, 255, 255), Rgb(0x7a, 0xa2, 0xf7), Rgb(0xe6, 0x8e, 0x0d)] {
+            let (l, a, b) = oklab::from_rgb(c);
+            let back = oklab::to_rgb(l, a, b).unwrap();
+            assert!((back.0 as i32 - c.0 as i32).abs() <= 1 && (back.1 as i32 - c.1 as i32).abs() <= 1 && (back.2 as i32 - c.2 as i32).abs() <= 1, "{c:?} -> {back:?}");
+        }
+    }
+
+    #[test]
+    fn vivid_saturates_but_keeps_hue_and_greys() {
+        let t = Theme::from_colors_toml("accent = \"#7daea3\"\n", false).vivid(); // gruvbox, a muted teal
+        let before = Rgb(0x7d, 0xae, 0xa3);
+        assert!(t.rain.chroma() > before.chroma() * 1.4, "{:?}", t.rain);
+        assert!(oklab::from_rgb(t.rain).0 >= 0.71);
+        let hue = |c: Rgb| xterm::lch(c).2;
+        assert!((hue(t.rain) - hue(before)).abs() < 0.08);
+        assert_eq!(oklab::saturate(Rgb(128, 128, 128), 1.8), Rgb(128, 128, 128));
+        // Already at the gamut edge: stays a valid colour, not garbage.
+        let m = oklab::saturate(Rgb(0x39, 0xff, 0x6a), 1.8);
+        assert!(m.1 > 200 && m.1 > m.0 && m.1 > m.2, "{m:?}");
+    }
+
+    #[test]
+    fn heat_runs_from_hue_to_white_hot() {
+        let t = Theme::matrix();
+        assert_eq!(t.heat(0.0), t.wire);
+        assert_eq!(t.heat(0.5), t.fire);
+        assert!(t.heat(1.0).luma() > t.fire.luma());
     }
 
     #[test]

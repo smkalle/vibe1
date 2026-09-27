@@ -68,6 +68,7 @@ pub enum Event {
     Land,
 }
 
+#[derive(Clone)]
 pub struct Fly {
     pub pos: V3,
     pub yaw: f32,

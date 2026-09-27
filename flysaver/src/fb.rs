@@ -65,6 +65,8 @@ pub struct Frame {
     /// Cells the rain must leave alone (behind the logo).
     pub rain_mask: Vec<bool>,
     pub out: Vec<Out>,
+    /// Brightness of the dimmest drawn vector dot (vivid mode raises it).
+    pub floor: f32,
     /// Truecolor or 256 (never Auto: resolve before rendering).
     pub colors: Colors,
     palette: Palette256,
@@ -84,6 +86,7 @@ impl Frame {
             overlay: vec![None; n],
             rain_mask: vec![false; n],
             out: vec![Out::BLANK; n],
+            floor: 0.25,
             colors: Colors::TrueColor,
             palette: Palette256::default(),
         }
@@ -165,7 +168,7 @@ impl Frame {
                 }
                 let rain = self.rain[idx];
                 self.out[idx] = if bits != 0 && vmax >= rain.i * 0.9 {
-                    Out::new(char::from_u32(0x2800 + bits).unwrap_or(' '), vcol.scale(levels(0.25 + 0.75 * vmax)))
+                    Out::new(char::from_u32(0x2800 + bits).unwrap_or(' '), vcol.scale(levels(self.floor + (1.0 - self.floor) * vmax)))
                 } else if rain.i > 0.02 {
                     Out::new(rain.ch, rain.fg.scale(levels(rain.i)))
                 } else {

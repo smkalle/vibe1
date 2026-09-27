@@ -19,6 +19,8 @@ pub struct Cam {
     aspect: f32,
     pub fog_near: f32,
     pub fog_far: f32,
+    /// Distant lines never dim below this.
+    pub fog_floor: f32,
 }
 
 impl Cam {
@@ -42,6 +44,7 @@ impl Cam {
             aspect,
             fog_near: 0.5,
             fog_far: 6.0,
+            fog_floor: 0.12,
         }
     }
 
@@ -71,7 +74,7 @@ impl Cam {
 
     pub fn fog(&self, z: f32) -> f32 {
         let t = (z - self.fog_near) / (self.fog_far - self.fog_near);
-        (1.0 - t).clamp(0.12, 1.0)
+        (1.0 - t).clamp(self.fog_floor, 1.0)
     }
 }
 

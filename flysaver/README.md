@@ -25,6 +25,30 @@ It follows your current Omarchy theme.
 
 ## Install
 
+A single command fetches the source from GitHub, builds it, installs it and
+checks the setup:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/smkalle/vibe1/main/flysaver/deploy.sh | bash
+```
+
+If `git`, `rust`, `socat` or `jq` are missing, it asks before installing them
+with pacman. It keeps its checkout in `~/.local/src/flysaver`. Re-run the same
+command to update.
+
+Options go after `bash -s --`:
+
+| Option | Effect |
+|---|---|
+| `--now` | start the screensaver on every monitor right away |
+| `--test` | run the test suite first |
+| `--ref <branch/tag/sha>` | build a different version |
+| `--uninstall` | remove flysaver |
+
+For example: `curl -fsSL …/deploy.sh | bash -s -- --now`.
+
+To build from a checkout by hand instead:
+
 ```bash
 cd flysaver
 cargo build --release

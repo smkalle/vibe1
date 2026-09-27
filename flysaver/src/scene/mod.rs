@@ -47,6 +47,8 @@ pub struct Scene {
     /// Phase 3: the open lesson, the sugar, and what the fly remembers.
     pub lesson: Option<OpenLesson>,
     pub sugar: Spot,
+    /// Bitter lacing on the sugared fruit (0 = none).
+    pub bitter: f32,
     sugar_elapsed: f32,
     pub stats: MemoryStats,
     memory_path: Option<std::path::PathBuf>,
@@ -59,6 +61,9 @@ pub struct OpenLesson {
     pub approach: bool,
     pub landed: bool,
     pub since: f32,
+    /// When it started tasting the sugared fruit, and MN9's peak since.
+    pub tasting_since: Option<f32>,
+    pub mn9_peak: f32,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -74,6 +79,11 @@ pub struct MemoryStats {
 fn fruit_index(s: Spot) -> usize {
     if s == Spot::Bread { 1 } else { 0 }
 }
+
+/// How long the fly tastes the sugared fruit before the lesson's outcome.
+const TASTE_S: f32 = 2.0;
+/// How often a newly placed sugar is laced with bitter.
+const LACE_CHANCE: f32 = 0.4;
 
 /// The red-eyed mutant's eyes.
 pub const RED_EYES: Rgb = Rgb(0xff, 0x30, 0x48);
@@ -108,6 +118,7 @@ impl Scene {
             note: None,
             lesson: None,
             sugar: Spot::Banana,
+            bitter: 0.0,
             sugar_elapsed: 0.0,
             stats: MemoryStats { last_p: [f32::NAN; 2], ..MemoryStats::default() },
             memory_path: None,
@@ -127,6 +138,7 @@ impl Scene {
     /// Start the lessons: load the fly's memory (when remembering), else put the sugar somewhere.
     pub fn start_memory(&mut self, path: Option<std::path::PathBuf>) {
         self.sugar = if self.rng.chance(0.5) { Spot::Banana } else { Spot::Bread };
+        self.lace();
         self.memory_path = path.filter(|_| self.cfg.remember && self.cfg.learning);
         let Some(p) = self.memory_path.clone() else { return };
         let Some(live) = self.live_mut() else { return };
@@ -136,6 +148,7 @@ impl Scene {
             live.remember(&m);
             self.sugar = if m.sugar == 1 { Spot::Bread } else { Spot::Banana };
             self.sugar_elapsed = m.sugar_elapsed;
+            self.bitter = if self.cfg.bitter { m.bitter } else { 0.0 };
             self.stats = MemoryStats { lessons: m.lessons, rewards: m.rewards, blows: m.blows, last_p: m.last_p, changed: 0 };
             self.refresh_changed();
             self.say(format!("remembers {} lessons", m.lessons));
@@ -165,6 +178,7 @@ impl Scene {
             sugar: fruit_index(self.sugar) as u8,
             sugar_elapsed: self.sugar_elapsed,
             last_p: self.stats.last_p,
+            bitter: self.bitter,
         };
         let _ = m.save(path, live.net.weights_fnv.0);
     }
@@ -182,7 +196,8 @@ impl Scene {
                 self.stats.blows += 1;
             }
             self.refresh_changed();
-            self.say(format!("lesson: {}, {why} {reward:+} (dopamine {:+.2})", lesson.fruit.name(), out.dopamine));
+            let r = if reward.fract() == 0.0 { format!("{reward:+}") } else { format!("{reward:+.2}") };
+            self.say(format!("lesson: {}, {why} {r} (dopamine {:+.2})", lesson.fruit.name(), out.dopamine));
             self.save_memory();
         }
     }
@@ -199,7 +214,7 @@ impl Scene {
                 self.stats.last_p[fruit_index(fruit)] = p as f32;
                 let learning = self.brain.as_ref().and_then(|b| b.live.as_ref()).is_some_and(|l| l.learner.is_some());
                 if learning {
-                    self.lesson = Some(OpenLesson { fruit, approach, landed: false, since: self.t });
+                    self.lesson = Some(OpenLesson { fruit, approach, landed: false, since: self.t, tasting_since: None, mn9_peak: 0.0 });
                 }
                 self.say(format!("mushroom body: {}, {} (p {p:.2})", fruit.name(), if approach { "approach" } else { "avoid" }));
             }
@@ -209,12 +224,11 @@ impl Scene {
         for e in self.fly.events.clone() {
             match e {
                 crate::sim::Event::Land if on_it && l.approach => {
-                    if l.fruit == self.sugar {
-                        self.close_lesson(1.0, "sugar");
-                        return;
-                    }
                     if let Some(open) = &mut self.lesson {
                         open.landed = true; // stays open while it sits: leaving pays 0, a blow -1
+                        if l.fruit == self.sugar {
+                            open.tasting_since = Some(self.t); // the labellum tastes; MN9 decides
+                        }
                     }
                 }
                 crate::sim::Event::Hit if l.landed => {
@@ -226,6 +240,22 @@ impl Scene {
                     return;
                 }
                 _ => {}
+            }
+        }
+        // Two seconds of tasting the sugared fruit: sugar if it fed, minus how bitter it was.
+        if let Some(t0) = l.tasting_since {
+            let now = self.fly.cmd.map_or(0.0, |c| c.mn9);
+            if let Some(open) = &mut self.lesson {
+                open.mn9_peak = open.mn9_peak.max(now);
+            }
+            if self.t - t0 >= TASTE_S {
+                let fed = self.fly.feeding;
+                let mn9 = self.lesson.map_or(0.0, |o| o.mn9_peak);
+                let reward = if fed { 1.0 } else { 0.0 } - self.bitter as f64;
+                let taste = if self.bitter > 0.0 { format!("sugar + caffeine {:.2}", self.bitter) } else { "sugar".into() };
+                let what = format!("{taste}, MN9 peak {mn9:.3} → {}", if fed { "fed" } else { "refused" });
+                self.close_lesson(reward, &what);
+                return;
             }
         }
         let age = self.t - l.since;
@@ -245,10 +275,11 @@ impl Scene {
         }
         let p = |x: f32| if x.is_nan() { "?".to_string() } else { format!("{x:.2}") };
         Some(format!(
-            "memory {} lessons · {} synapses changed · sugar on the {} · p banana {} / bread {}",
+            "memory {} lessons · {} synapses changed · sugar on the {}{} · p banana {} / bread {}",
             self.stats.lessons,
             self.stats.changed,
             self.sugar.name(),
+            if self.bitter > 0.0 { format!(" (caffeine {:.2})", self.bitter) } else { String::new() },
             p(self.stats.last_p[0]),
             p(self.stats.last_p[1])
         ))
@@ -259,9 +290,16 @@ impl Scene {
         if self.sugar_elapsed > self.cfg.sugar_minutes * 60.0 {
             self.sugar_elapsed = 0.0;
             self.sugar = if self.sugar == Spot::Banana { Spot::Bread } else { Spot::Banana };
-            self.say(format!("the sugar moved to the {}", self.sugar.name()));
+            self.lace();
+            let laced = if self.bitter > 0.0 { format!(", laced with caffeine {:.2}", self.bitter) } else { String::new() };
+            self.say(format!("the sugar moved to the {}{laced}", self.sugar.name()));
             self.save_memory();
         }
+    }
+
+    /// Maybe lace the sugared fruit with a bitter compound, at a random strength.
+    fn lace(&mut self) {
+        self.bitter = if self.cfg.bitter && self.rng.chance(LACE_CHANCE) { self.rng.range(0.2, 1.0) } else { 0.0 };
     }
 
     fn say(&mut self, text: String) {
@@ -282,6 +320,7 @@ impl Scene {
         self.fly.threat_at = self.threat.as_ref().map(|t| t.pos);
         let (gf, asym) = live.map_or((0.0, 0.0), |l| (l.giant_fibre(), l.turn_asym()));
         self.fly.sugar = Some(self.sugar);
+        self.fly.bitter = self.bitter;
         self.fly.step(dt, &mut self.rng);
         // The swatter: it comes for a fly that has been sitting a while. It moves right
         // after the fly, so a blow is among this frame's events for the notes and lessons.
@@ -535,7 +574,7 @@ mod tests {
             s.step(1.0 / 30.0, 80, 24);
         }
         let _ = s.live_mut().unwrap().decide(0.0); // an approach decision the outcome can credit
-        s.lesson = Some(OpenLesson { fruit: Spot::Banana, approach: true, landed: true, since: s.t });
+        s.lesson = Some(OpenLesson { fruit: Spot::Banana, approach: true, landed: true, since: s.t, tasting_since: None, mn9_peak: 0.0 });
         s.threat = Some(Threat::aimed_at(s.fly.pos, &mut Rng::new(4)));
         for _ in 0..90 {
             s.step(1.0 / 30.0, 80, 24);
@@ -543,6 +582,78 @@ mod tests {
         assert_eq!(s.stats.blows, 1, "the blow was not taught ({:?})", s.note);
         assert!(s.lesson.is_none());
         assert!(s.note.as_ref().is_some_and(|(n, _)| n.contains("struck there -1")), "{:?}", s.note);
+    }
+
+    /// A brain-piloted scene whose brain has tasted sweet sugar once and flown off (as in
+    /// the screensaver after its first sugar: a brain's first taste bursts ~10x higher),
+    /// now hovering hungry over the sugared bread, laced at `bitter`.
+    fn experienced(bitter: f32) -> Scene {
+        let cfg = Config { threats: false, glitch: false, bitter: false, ..Config::default() };
+        let mut s = Scene::new(cfg, Theme::matrix(), 5);
+        s.start_memory(None);
+        s.sugar = Spot::Bread;
+        let run = |s: &mut Scene, n: usize| (0..n).for_each(|_| s.step(1.0 / 30.0, 80, 24));
+        s.fly.pos = crate::math::v3(1.0, 1.3, 1.0);
+        run(&mut s, 40);
+        s.fly.perch(Spot::Bread);
+        run(&mut s, 120);
+        s.fly = Fly::new(&mut Rng::new(9));
+        s.fly.pos = crate::math::v3(0.5, 1.4, 0.5);
+        run(&mut s, 150);
+        s.lesson = None;
+        s.bitter = bitter;
+        s.fly.hunger = 0.8;
+        s.fly.pos = Spot::Bread.pos() + crate::math::v3(0.0, 0.15, 0.0);
+        run(&mut s, 30);
+        s
+    }
+
+    /// `experienced`, then it lands on the bread and tastes it for 3 s.
+    fn taste(bitter: f32) -> Scene {
+        let mut s = experienced(bitter);
+        s.fly.perch(Spot::Bread);
+        s.fly.hunger = 0.8;
+        for _ in 0..90 {
+            s.step(1.0 / 30.0, 80, 24);
+        }
+        s
+    }
+
+    #[test]
+    fn the_proboscis_extension_reflex_decides_feeding() {
+        let sweet = taste(0.0);
+        let laced = taste(1.0);
+        eprintln!(
+            "sweet: MN9 {:.3}, proboscis {:.2}, feeding {}; laced 1.0: MN9 {:.3}, proboscis {:.2}, feeding {}",
+            sweet.fly.cmd.unwrap().mn9, sweet.fly.proboscis, sweet.fly.feeding,
+            laced.fly.cmd.unwrap().mn9, laced.fly.proboscis, laced.fly.feeding
+        );
+        assert!(sweet.fly.feeding && sweet.fly.proboscis > 0.5);
+        assert!(!laced.fly.feeding && laced.fly.proboscis < 0.1);
+    }
+
+    #[test]
+    fn a_laced_fruit_is_a_bitter_lesson() {
+        for (bitter, fed, sign) in [(0.0f32, true, 1.0f64), (1.0, false, -1.0)] {
+            let mut s = experienced(bitter);
+            let before = s.stats.lessons;
+            let _ = s.live_mut().unwrap().decide(0.0);
+            // It lands: the lesson starts tasting as the Land event would start it.
+            s.fly.perch(Spot::Bread);
+            s.fly.hunger = 0.8;
+            s.lesson = Some(OpenLesson { fruit: Spot::Bread, approach: true, landed: true, since: s.t, tasting_since: Some(s.t), mn9_peak: 0.0 });
+            for _ in 0..75 {
+                s.step(1.0 / 30.0, 80, 24);
+            }
+            let note = s.note.clone().map(|(n, _)| n).unwrap_or_default();
+            eprintln!("bitter {bitter}: {note}");
+            assert!(s.lesson.is_none() && s.stats.lessons == before + 1, "{note}");
+            assert!(note.contains(if fed { "fed" } else { "refused" }), "{note}");
+            let peak: f32 = note.split("MN9 peak ").nth(1).unwrap()[..5].parse().unwrap();
+            assert!(if fed { peak > 0.005 } else { peak < 0.005 }, "{note}");
+            let dopamine: f64 = note.rsplit("dopamine ").next().unwrap().trim_end_matches(')').parse().unwrap();
+            assert!(dopamine * sign > 0.0, "{note}");
+        }
     }
 
     #[test]
@@ -553,3 +664,4 @@ mod tests {
         }
     }
 }
+

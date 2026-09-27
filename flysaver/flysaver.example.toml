@@ -20,5 +20,6 @@ eyes = "red"             # red (the mutant) | theme
 learning = true          # lessons rewire the Kenyon-cell -> MBON synapses
 remember = true          # keep what it learned in ~/.local/state/flysaver/memory.bin
 sugar_minutes = 20       # screensaver minutes before the sugar moves to the other fruit
+bitter = true            # sometimes lace the sugar with caffeine (the fly tastes it, and learns)
 glitch = true
 hud = true

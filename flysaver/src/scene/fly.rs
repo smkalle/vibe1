@@ -64,13 +64,26 @@ pub fn draw(f: &mut Frame, cam: &Cam, theme: &Theme, fly: &Fly) {
         line3(f, cam, pose.w(tip), pose.w(v3(0.56, 0.12, side * 0.08)), 0.5, body);
     }
 
-    if fly.feeding {
-        let ext = 0.6 + 0.4 * (fly.time * 5.0).sin().abs();
-        line3(f, cam, pose.w(v3(0.42, -0.04, 0.0)), pose.w(v3(0.46, -0.04 - 0.2 * ext, 0.0)), 1.0, theme.fire);
-    }
-
     legs(f, cam, &pose, fly, body);
     wings(f, cam, &pose, fly, body);
+
+    // The proboscis, drawn last so no leg takes its cells: out as far as MN9 drives it,
+    // amber for sugar, violet as it tastes bitter.
+    if fly.proboscis > 0.03 {
+        let bitter = fly.tasting().map_or(0.0, |(_, b)| b);
+        let col = proboscis_colour(bitter);
+        let pump = if fly.feeding { 0.08 * (fly.time * 5.0).sin().abs() } else { 0.0 };
+        let ext = fly.proboscis * (0.92 + pump);
+        let (root, tip) = (v3(0.42, -0.05, 0.0), v3(0.48, -0.05 - 0.4 * ext, 0.0));
+        // Two strands, so the proboscis reads as a tube and not a hairline.
+        for dz in [-0.012f32, 0.012] {
+            line3(f, cam, pose.w(root + v3(0.0, 0.0, dz)), pose.w(tip + v3(0.0, 0.0, dz)), 1.0, col);
+        }
+        // The labellum's two lobes at the tip.
+        for side in [-1.0f32, 1.0] {
+            line3(f, cam, pose.w(tip), pose.w(tip + v3(0.02, -0.02, side * 0.025) * ext.max(0.3)), 1.0, col);
+        }
+    }
 }
 
 /// Wire ellipsoid: latitude rings along the body axis plus two meridians.
@@ -188,4 +201,9 @@ pub fn draw_threat(f: &mut Frame, cam: &Cam, t: &crate::sim::Threat) {
     }
     // The handle trails behind the head.
     line3(f, cam, corner(0.0, -1.0), c - fwd * 0.35 - up * r * 1.5, 0.8, col);
+}
+
+/// Amber-gold for sugar, toward violet by how bitter the taste is.
+pub fn proboscis_colour(bitter: f32) -> Rgb {
+    crate::theme::proboscis(bitter)
 }

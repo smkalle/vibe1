@@ -7,7 +7,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 const MAGIC: &[u8; 4] = b"FLYM";
-const VERSION: u32 = 1;
+/// v2 added the sugar's bitter lacing; v1 files still load (as unlaced).
+const VERSION: u32 = 2;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Memory {
@@ -23,6 +24,8 @@ pub struct Memory {
     pub sugar_elapsed: f32,
     /// The last approach probability the mushroom body gave each fruit (banana, bread); NaN if never.
     pub last_p: [f32; 2],
+    /// How strongly the sugared fruit is laced with bitter (0 = not).
+    pub bitter: f32,
 }
 
 pub fn path() -> PathBuf {
@@ -46,7 +49,7 @@ impl Memory {
             b.extend_from_slice(&c.to_le_bytes());
         }
         b.push(self.sugar);
-        for f in [self.sugar_elapsed, self.last_p[0], self.last_p[1]] {
+        for f in [self.sugar_elapsed, self.last_p[0], self.last_p[1], self.bitter] {
             b.extend_from_slice(&f.to_le_bytes());
         }
         b
@@ -67,7 +70,8 @@ impl Memory {
         let u64_ = |s: &[u8]| u64::from_le_bytes(s.try_into().unwrap());
         let f64_ = |s: &[u8]| f64::from_le_bytes(s.try_into().unwrap());
         let f32_ = |s: &[u8]| f32::from_le_bytes(s.try_into().unwrap());
-        if u32_(take(4)?) != VERSION {
+        let version = u32_(take(4)?);
+        if version != 1 && version != VERSION {
             return Err("memory from another version".into());
         }
         if u64_(take(8)?) != brain_fnv {
@@ -83,10 +87,11 @@ impl Memory {
         let (lessons, rewards, blows) = (u64_(take(8)?), u64_(take(8)?), u64_(take(8)?));
         let sugar = take(1)?[0].min(1);
         let (sugar_elapsed, p0, p1) = (f32_(take(4)?), f32_(take(4)?), f32_(take(4)?));
+        let bitter = if version >= 2 { f32_(take(4)?).clamp(0.0, 1.0) } else { 0.0 };
         if efficacy.iter().chain(&w_critic).any(|x| !x.is_finite()) {
             return Err("memory holds non-finite numbers".into());
         }
-        Ok(Memory { efficacy, w_critic, b_critic, lessons, rewards, blows, sugar, sugar_elapsed, last_p: [p0, p1] })
+        Ok(Memory { efficacy, w_critic, b_critic, lessons, rewards, blows, sugar, sugar_elapsed, last_p: [p0, p1], bitter })
     }
 
     pub fn save(&self, to: &Path, brain_fnv: u64) -> io::Result<()> {
@@ -120,7 +125,18 @@ mod tests {
             sugar: 1,
             sugar_elapsed: 321.5,
             last_p: [0.56, f32::NAN],
+            bitter: 0.4,
         }
+    }
+
+    #[test]
+    fn version_1_files_still_load_as_unlaced() {
+        let mut b = sample().encode(42);
+        b.truncate(b.len() - 4); // v1 had no bitter field
+        b[4..8].copy_from_slice(&1u32.to_le_bytes());
+        let m = Memory::decode(&b, 42, 3, 2).unwrap();
+        assert_eq!((m.bitter, m.lessons), (0.0, 12));
+        assert_eq!(Memory::decode(&sample().encode(42), 42, 3, 2).unwrap().bitter, 0.4);
     }
 
     #[test]

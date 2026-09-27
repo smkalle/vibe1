@@ -54,7 +54,13 @@ pub struct Command {
     pub escape: bool,
     pub feed: bool,
     pub groom: bool,
+    /// The proboscis motor neuron's activity, which sets how far the proboscis extends.
+    pub mn9: f32,
 }
+
+/// MN9 activity that fully extends the drawn proboscis, before feeding latches it out.
+/// A refused, laced taste (MN9 below the feeding level) shows as a short flick.
+const MN9_FULL: f32 = 0.05;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Mode {
@@ -141,6 +147,10 @@ pub struct Fly {
     pub threat_at: Option<V3>,
     /// The fruit with sugar on it: the only one the fly feeds on.
     pub sugar: Option<Spot>,
+    /// How strongly the sugared fruit is laced with a bitter compound (0 = not at all).
+    pub bitter: f32,
+    /// Proboscis extension, 0 (retracted) to 1: MN9's reflex when brain-piloted.
+    pub proboscis: f32,
 }
 
 impl Fly {
@@ -176,7 +186,14 @@ impl Fly {
             punish: 0.0,
             threat_at: None,
             sugar: None,
+            bitter: 0.0,
+            proboscis: 0.0,
         }
+    }
+
+    /// What the labellum tastes: (sugar, bitter) while sitting on the sugared fruit.
+    pub fn tasting(&self) -> Option<(f32, f32)> {
+        (!self.airborne() && self.spot.is_some() && self.spot == self.sugar).then_some((1.0, self.bitter))
     }
 
     /// Put the fly down on `spot` for a long sit (tests and demos).
@@ -299,6 +316,14 @@ impl Fly {
         if let Some(cmd) = self.cmd {
             self.obey(cmd);
         }
+        // The proboscis: MN9's reflex when brain-piloted, else out while feeding.
+        let reach = match (self.cmd, self.tasting()) {
+            (Some(_), Some(_)) if self.feeding => 1.0,
+            (Some(cmd), Some(_)) => (cmd.mn9 / MN9_FULL).clamp(0.0, 1.0).sqrt(),
+            (Some(_), None) => 0.0,
+            (None, _) => if self.feeding { 1.0 } else { 0.0 },
+        };
+        self.proboscis = damp(self.proboscis, reach, 8.0, dt);
         if self.airborne() {
             self.wing_phase = (self.wing_phase + dt * 11.0) % 1.0; // visual flicker, not 200 Hz
         }
@@ -329,7 +354,9 @@ impl Fly {
                 self.set_mode(Mode::Approach, 20.0);
             }
             Mode::Sitting => {
-                if cmd.feed && self.spot.is_some() && self.spot == self.sugar && self.hunger > 0.15 {
+                // The proboscis extension reflex: MN9 firing on contact starts a feeding bout,
+                // which lasts the sit (as the original's startFeeding).
+                if self.tasting().is_some() && cmd.feed && self.hunger > 0.15 {
                     self.feeding = true;
                 }
                 if cmd.groom && !self.feeding {
@@ -490,7 +517,8 @@ impl Fly {
         self.roll = damp(self.roll, 0.0, 6.0, dt);
         if (self.pos - rest).len() < 0.004 || self.mode_t > self.mode_len {
             self.pos = rest;
-            self.feeding = Some(spot) == self.sugar && self.hunger > 0.15 && rng.chance(0.9);
+            // Instincts feed on sugar by chance; a brain-piloted fly waits for its MN9.
+            self.feeding = self.cmd.is_none() && Some(spot) == self.sugar && self.hunger > 0.15 && rng.chance(0.9);
             if spot.is_food() {
                 self.avoided = None;
             }

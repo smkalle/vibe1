@@ -204,6 +204,8 @@ pub fn doctor() -> bool {
 
     let colors = home().join(".local/state/omarchy/current/theme/colors.toml");
     check(colors.exists(), true, format!("theme colours at {}", colors.display()));
+    let (cfg0, _) = config::load();
+    check(true, true, format!("palette: {}", crate::theme::Theme::load(cfg0.palette).origin));
 
     let (_, warnings) = config::load();
     let cfg_state = if !config::config_path().exists() {

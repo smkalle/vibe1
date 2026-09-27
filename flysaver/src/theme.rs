@@ -37,6 +37,10 @@ impl Rgb {
         }
         c
     }
+    /// OKLab chroma: 0 for greys, ~0.1-0.2 for clearly coloured accents.
+    pub fn chroma(self) -> f32 {
+        xterm::lch(self).1
+    }
     pub fn parse(s: &str) -> Option<Rgb> {
         let h = s.trim().trim_start_matches('#').trim_start_matches("0x");
         if h.len() < 6 {
@@ -78,9 +82,9 @@ pub mod xterm {
 
     /// OKLab as (lightness, chroma, hue angle).
     #[derive(Clone, Copy)]
-    struct Lch(f32, f32, f32);
+    pub(super) struct Lch(pub f32, pub f32, pub f32);
 
-    fn lch(c: Rgb) -> Lch {
+    pub(super) fn lch(c: Rgb) -> Lch {
         let lin = |v: u8| {
             let v = v as f32 / 255.0;
             if v <= 0.04045 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
@@ -138,9 +142,15 @@ pub mod xterm {
     }
 }
 
+/// An accent with less chroma than this is grey (vantablack, white and
+/// solitude are 0-0.012; the warm neutrals kanagawa and last-horizon ~0.04).
+const GREY_ACCENT: f32 = 0.03;
+
 /// Colour roles from spec section 5.
 #[derive(Clone, Debug)]
 pub struct Theme {
+    /// Where the colours came from, for `flysaver doctor`.
+    pub origin: String,
     pub rain: Rgb,
     pub rain_head: Rgb,
     pub wire: Rgb,
@@ -154,6 +164,7 @@ impl Theme {
     /// The original page's palette: #39ff6a on black.
     pub fn matrix() -> Theme {
         Theme {
+            origin: "matrix green".into(),
             rain: Rgb(0x39, 0xff, 0x6a),
             rain_head: Rgb(0xd8, 0xff, 0xe4),
             wire: Rgb(0x39, 0xff, 0x6a),
@@ -164,7 +175,10 @@ impl Theme {
         }
     }
 
-    pub fn from_colors_toml(src: &str) -> Theme {
+    /// Map a theme's colors.toml onto the roles. Unless `strict`, a theme whose
+    /// accent is grey gets the Matrix green instead: following it would turn the
+    /// whole scene black and white.
+    pub fn from_colors_toml(src: &str, strict: bool) -> Theme {
         let kv = config::parse_flat_toml(src);
         let get = |k: &str| match kv.get(k) {
             Some(Value::Str(s)) => Rgb::parse(s),
@@ -172,12 +186,20 @@ impl Theme {
         };
         let m = Theme::matrix();
         let accent = get("accent").or(get("green")).unwrap_or(m.rain);
+        let hex = format!("#{:02x}{:02x}{:02x}", accent.0, accent.1, accent.2);
+        if !strict && accent.chroma() < GREY_ACCENT {
+            return Theme {
+                origin: format!("matrix green (the theme's accent {hex} is grey; palette = \"theme-strict\" keeps it)"),
+                ..Theme::matrix()
+            };
+        }
         let fg = get("foreground").unwrap_or(m.fly);
         let head = get("bright_foreground").unwrap_or(fg);
         let fire = get("bright_green").or(get("green")).unwrap_or(accent);
         let hud = get("dark_foreground").unwrap_or(accent.scale(0.5));
         // The saver always runs on black, so every role must read on black.
         Theme {
+            origin: format!("Omarchy theme, accent {hex}"),
             rain: accent.at_least(0.35),
             rain_head: head.at_least(0.75),
             wire: accent.at_least(0.35),
@@ -194,8 +216,14 @@ impl Theme {
         }
         let dir = config::home().join(".local/state/omarchy/current");
         match std::fs::read_to_string(dir.join("theme/colors.toml")) {
-            Ok(src) => Theme::from_colors_toml(&src),
-            Err(_) => Theme::matrix(),
+            Ok(src) => {
+                let mut t = Theme::from_colors_toml(&src, p == Palette::ThemeStrict);
+                if let Ok(name) = std::fs::read_to_string(dir.join("theme.name")) {
+                    t.origin = format!("{} [{}]", t.origin, name.trim());
+                }
+                t
+            }
+            Err(_) => Theme { origin: "matrix green (no Omarchy theme found)".into(), ..Theme::matrix() },
         }
     }
 }
@@ -213,7 +241,7 @@ mod tests {
 
     #[test]
     fn light_theme_colours_are_lifted() {
-        let t = Theme::from_colors_toml("accent = \"#1a1a1a\"\nforeground = \"#101010\"\n");
+        let t = Theme::from_colors_toml("accent = \"#1a2a5a\"\nforeground = \"#101010\"\n", false);
         assert!(t.rain.luma() >= 0.35);
         assert!(t.fly.luma() >= 0.7);
     }
@@ -269,8 +297,26 @@ mod tests {
     }
 
     #[test]
+    fn grey_themes_fall_back_to_matrix_green() {
+        // vantablack, white and solitude: no hue to follow.
+        for accent in ["#8d8d8d", "#6e6e6e", "#798186"] {
+            let t = Theme::from_colors_toml(&format!("accent = \"{accent}\"\nforeground = \"#ffffff\"\n"), false);
+            assert_eq!(t.rain, Theme::matrix().rain, "{accent}");
+            assert!(t.origin.contains("is grey"), "{}", t.origin);
+        }
+        // Warm neutrals with a visible hue keep their own colour.
+        for accent in ["#dcd7ba", "#b59790"] {
+            let t = Theme::from_colors_toml(&format!("accent = \"{accent}\"\n"), false);
+            assert_ne!(t.rain, Theme::matrix().rain, "{accent}");
+        }
+        // theme-strict keeps the grey.
+        let t = Theme::from_colors_toml("accent = \"#8d8d8d\"\n", true);
+        assert_eq!(t.rain.chroma() < GREY_ACCENT, true);
+    }
+
+    #[test]
     fn hackerman_keeps_its_accent() {
-        let t = Theme::from_colors_toml("accent = \"#82FB9C\"\nbright_green = \"#9cf7c2\"\n");
+        let t = Theme::from_colors_toml("accent = \"#82FB9C\"\nbright_green = \"#9cf7c2\"\n", false);
         assert_eq!(t.rain, Rgb(0x82, 0xfb, 0x9c));
         assert_eq!(t.fire, Rgb(0x9c, 0xf7, 0xc2));
     }

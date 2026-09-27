@@ -337,3 +337,11 @@ Not yet verified on a real Omarchy/Hyprland desktop. This build environment has 
 | CPU | 0.9–1.0 ms/frame | 1.05–1.1 ms/frame |
 
 256 mode cuts output by about a third. That's short of the < 300 KB/s estimated in the plan; only the brain view gets there. Most of the remaining output is braille characters that change as the camera moves.
+
+### Grey themes (follow-up)
+
+A report from a real Omarchy desktop showed the screensaver rendering entirely in white and grey. The cause was the theme, not the colour mode. With `palette = "theme"`, flysaver follows the theme's accent, and the vantablack (`#8d8d8d`), white (`#6e6e6e`) and solitude (`#798186`) themes have no hue: OKLab chroma 0–0.012, against 0.04–0.23 for every other theme.
+
+- **Default now:** `palette = "theme"` falls back to the Matrix green when the accent's chroma is below 0.03. Warm neutrals such as kanagawa and last-horizon still follow their theme.
+- **Keeping the grey look:** `palette = "theme-strict"`.
+- **Diagnosis:** `flysaver doctor` prints which palette was chosen and why.

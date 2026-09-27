@@ -86,6 +86,49 @@ pub enum Palette {
     Matrix,
 }
 
+/// How colours reach the terminal.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Colors {
+    /// Truecolor when the terminal says it has it (COLORTERM), else 256.
+    Auto,
+    TrueColor,
+    Xterm256,
+}
+
+impl Colors {
+    pub fn parse(s: &str) -> Option<Colors> {
+        Some(match s {
+            "auto" => Colors::Auto,
+            "truecolor" | "24bit" => Colors::TrueColor,
+            "256" => Colors::Xterm256,
+            _ => return None,
+        })
+    }
+
+    /// Settle `auto` against the terminal's COLORTERM.
+    pub fn resolve(self, colorterm: Option<&str>) -> Colors {
+        match self {
+            Colors::Auto => match colorterm {
+                Some("truecolor") | Some("24bit") => Colors::TrueColor,
+                _ => Colors::Xterm256,
+            },
+            fixed => fixed,
+        }
+    }
+
+    pub fn resolve_env(self) -> Colors {
+        self.resolve(std::env::var("COLORTERM").ok().as_deref())
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Colors::Auto => "auto",
+            Colors::TrueColor => "truecolor",
+            Colors::Xterm256 => "256",
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub fps: f32,
@@ -96,6 +139,7 @@ pub struct Config {
     pub brain_points: usize,
     pub camera: CameraMode,
     pub palette: Palette,
+    pub colors: Colors,
     pub glitch: bool,
     pub hud: bool,
 }
@@ -111,6 +155,7 @@ impl Default for Config {
             brain_points: 8000,
             camera: CameraMode::Cycle,
             palette: Palette::Theme,
+            colors: Colors::Auto,
             glitch: true,
             hud: true,
         }
@@ -141,6 +186,11 @@ impl Config {
                     "matrix" => { self.palette = Palette::Matrix; true }
                     _ => false,
                 },
+                ("colors", Value::Str(s)) => match Colors::parse(s) {
+                    Some(c) => { self.colors = c; true }
+                    None => false,
+                },
+                ("colors", Value::Num(n)) if *n == 256.0 => { self.colors = Colors::Xterm256; true }
                 ("glitch", Value::Bool(b)) => { self.glitch = *b; true }
                 ("hud", Value::Bool(b)) => { self.hud = *b; true }
                 _ => false,
@@ -204,6 +254,19 @@ mod tests {
         assert_eq!(c.fps, 60.0);
         assert_eq!(c.camera, CameraMode::Brain);
         assert_eq!(w.len(), 1);
+    }
+
+    #[test]
+    fn colors_auto_follows_colorterm() {
+        assert_eq!(Colors::Auto.resolve(Some("truecolor")), Colors::TrueColor);
+        assert_eq!(Colors::Auto.resolve(Some("24bit")), Colors::TrueColor);
+        assert_eq!(Colors::Auto.resolve(None), Colors::Xterm256);
+        assert_eq!(Colors::Auto.resolve(Some("")), Colors::Xterm256);
+        assert_eq!(Colors::Xterm256.resolve(Some("truecolor")), Colors::Xterm256);
+        let mut c = Config::default();
+        assert!(c.apply(&parse_flat_toml("colors = \"256\"\n")).is_empty());
+        assert_eq!(c.colors, Colors::Xterm256);
+        assert!(c.apply(&parse_flat_toml("colors = 256\n")).is_empty());
     }
 
     #[test]

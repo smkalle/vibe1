@@ -10,5 +10,6 @@ layers = ["rain", "room", "brain", "fly", "hud"]   # add "logo" to show screensa
 brain_points = 8000      # 500-20000 neurons drawn
 camera = "cycle"         # cycle | follow | room | brain
 palette = "theme"        # theme (current Omarchy theme) | matrix (the original's green)
+colors = "auto"          # auto (truecolor if COLORTERM says so, else 256) | truecolor | 256
 glitch = true
 hud = true

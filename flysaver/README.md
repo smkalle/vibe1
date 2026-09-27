@@ -101,21 +101,43 @@ first-class hook.
 | `brain_points` | `8000` | 500–20000 neurons |
 | `camera` | `"cycle"` | `follow`, `room`, `brain`, or `cycle` through them every 30–60 s |
 | `palette` | `"theme"` | the current Omarchy theme, or `"matrix"` for the original's `#39ff6a` |
+| `colors` | `"auto"` | `"truecolor"`, `"256"`, or `auto`: truecolor when `COLORTERM` is `truecolor`/`24bit`, else 256 |
 | `glitch` | `true` | the occasional stutter and jitter |
 | `hud` | `true` | title, status line, credits |
 
 The same options work as flags: `flysaver preview --camera brain --palette matrix`.
+
+### 256 colours
+
+`colors = "256"` limits the screensaver to the xterm 256-colour palette. That
+helps inside tmux or screen without truecolor passthrough, or on terminals
+that lack 24-bit colour, and it also cuts output by about a third.
+
+- **Which colours it uses:** only the 6×6×6 colour cube and the grey ramp
+  (indices 16–255). Indices 0–15 are skipped, because terminals and Omarchy
+  themes redefine them.
+- **How it matches colours:** it compares hue in OKLab, a perceptual colour
+  space. Dim greens stay dark green instead of turning grey. A colour too dim
+  for the darkest matching shade fades to black instead of jumping brighter.
+- **What you lose:** there are about 4–6 visible brightness steps per colour
+  instead of 8, so depth fading is coarser.
+
+![truecolor and 256 colours side by side](screenshots/truecolor-vs-256.png)
 
 ## Performance
 
 These numbers come from `flysaver bench --size 230x65`, which is about a
 2560×1440 screen at Omarchy's screensaver font size.
 
-| | Measured |
-|---|---|
-| CPU | 0.7–0.8 ms per frame, which is 2.2–2.3% of one core at 30 fps |
-| Output to the terminal | 0.4–0.6 MB/s. Only changed cells are written, in one synchronized update per frame. |
-| Exit | under 2 ms after a key or mouse movement; about 45 ms after focus leaves |
+| | truecolor | 256 colours |
+|---|---|---|
+| CPU per frame | 0.9–1.0 ms (2.7–3.1% of one core at 30 fps) | 1.05–1.1 ms (3.2–3.4%) |
+| Output to the terminal | 0.40–0.60 MB/s | 0.25–0.41 MB/s |
+| Exit | under 2 ms after a key or mouse movement; about 45 ms after focus leaves | same |
+
+Only changed cells are written, in one synchronized update per frame. The
+256-colour column costs a little more CPU for the palette lookups (which are
+cached), and it writes shorter colour codes that change less often.
 
 ## How it works
 

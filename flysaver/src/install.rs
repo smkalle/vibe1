@@ -215,6 +215,18 @@ pub fn doctor() -> bool {
     };
     check(warnings.is_empty(), true, format!("config {} {cfg_state}", config::config_path().display()));
 
+    let (cfg, _) = config::load();
+    let resolved = cfg.colors.resolve_env();
+    check(
+        true,
+        true,
+        format!(
+            "colours: {} (COLORTERM={} in this shell; with auto, the screensaver's own terminal decides)",
+            if cfg.colors == config::Colors::Auto { format!("auto -> {}", resolved.name()) } else { cfg.colors.name().to_string() },
+            std::env::var("COLORTERM").unwrap_or_else(|_| "unset".into())
+        ),
+    );
+
     let off = home().join(".local/state/omarchy/toggles/screensaver-off");
     check(!off.exists(), true, "idle screensaver is enabled (omarchy toggle screensaver)".into());
     let disabled = home().join(".config/omarchy/flysaver.disabled");

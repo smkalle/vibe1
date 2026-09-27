@@ -15,7 +15,7 @@ mod sim;
 mod term;
 mod theme;
 
-use config::{Config, Palette};
+use config::{Colors, Config, Palette};
 use fb::{Frame, Screen};
 use scene::Scene;
 use std::sync::atomic::Ordering;
@@ -39,7 +39,7 @@ usage:
   flysaver about           credits and licences
 
 options (override ~/.config/omarchy/flysaver.toml):
-  --fps N  --camera cycle|follow|room|brain  --palette theme|matrix
+  --fps N  --camera cycle|follow|room|brain  --palette theme|matrix  --colors auto|truecolor|256
   --layers rain,room,brain,fly,hud,logo  --seed N
   --size COLSxROWS  --time SECONDS  --frames N  --html   (snapshot/bench)
 ";
@@ -86,6 +86,7 @@ fn parse_args(cfg: &mut Config) -> Result<Opts, String> {
                     _ => return Err("unknown palette".into()),
                 }
             }
+            "--colors" => cfg.colors = Colors::parse(&val("--colors")?).ok_or("colors is auto, truecolor or 256")?,
             "--layers" => cfg.layers = val("--layers")?.split(',').map(|s| s.trim().to_string()).collect(),
             "--seed" => o.seed = Some(val("--seed")?.parse().map_err(|_| "bad seed")?),
             "--size" => {
@@ -188,13 +189,16 @@ fn launch() -> i32 {
     }
 }
 
-/// Deterministic headless frame, used by the golden tests.
+/// Deterministic headless frame, used by the golden tests. Text snapshots are
+/// characters only, so they always compose in truecolor and do not depend on
+/// the terminal; HTML snapshots honour the colour mode.
 pub fn snapshot(cfg: Config, seed: u64, (cols, rows): (usize, usize), secs: f32, html: bool) -> String {
     let mut cfg = cfg;
     cfg.glitch = false;
+    let colors = if html { cfg.colors.resolve_env() } else { Colors::TrueColor };
     let theme = if html { Theme::load(cfg.palette) } else { Theme::matrix() };
     let mut scene = Scene::new(cfg, theme, seed);
-    let mut f = Frame::new(cols, rows);
+    let mut f = Frame::new(cols, rows).with_colors(colors);
     let dt = 1.0 / 30.0;
     for _ in 0..(secs / dt) as usize {
         scene.step(dt, cols, rows);
@@ -205,9 +209,10 @@ pub fn snapshot(cfg: Config, seed: u64, (cols, rows): (usize, usize), secs: f32,
 
 fn bench(cfg: Config, seed: u64, (cols, rows): (usize, usize), frames: usize) -> i32 {
     let fps = cfg.fps;
+    let colors = cfg.colors.resolve_env();
     let theme = Theme::load(cfg.palette);
     let mut scene = Scene::new(cfg, theme, seed);
-    let mut f = Frame::new(cols, rows);
+    let mut f = Frame::new(cols, rows).with_colors(colors);
     let mut screen = Screen::new();
     let dt = 1.0 / fps;
     let mut bytes = 0usize;
@@ -222,7 +227,7 @@ fn bench(cfg: Config, seed: u64, (cols, rows): (usize, usize), frames: usize) ->
         bytes += screen.render(&f).len();
     }
     let per = start.elapsed().as_secs_f64() / frames as f64;
-    println!("{cols}x{rows} cells, {frames} frames");
+    println!("{cols}x{rows} cells, {frames} frames, {} colours", colors.name());
     println!("  {:.2} ms/frame  -> {:.1}% of one core at {fps} fps", per * 1e3, per * fps as f64 * 100.0);
     println!("  {:.1} KB/frame  -> {:.0} KB/s to the terminal", bytes as f64 / frames as f64 / 1024.0, bytes as f64 / frames as f64 * fps as f64 / 1024.0);
     0
@@ -247,11 +252,12 @@ fn run(cfg: Config, seed: u64, preview: bool) -> i32 {
 
     let base_fps = cfg.fps;
     let battery_fps = cfg.battery_fps;
+    let colors = cfg.colors.resolve_env();
     let theme = Theme::load(cfg.palette);
     let mut scene = Scene::new(cfg, theme, seed);
     let mut size = term::size();
     scene.aspect = size.aspect();
-    let mut frame = Frame::new(size.cols, size.rows);
+    let mut frame = Frame::new(size.cols, size.rows).with_colors(colors);
     let mut screen = Screen::new();
     let mut watch = hypr_on.then(hypr::FocusWatch::new);
     let mut fps = if on_battery() { battery_fps.min(base_fps) } else { base_fps };
@@ -269,7 +275,7 @@ fn run(cfg: Config, seed: u64, preview: bool) -> i32 {
             if s != size {
                 size = s;
                 scene.aspect = size.aspect();
-                frame = Frame::new(size.cols, size.rows);
+                frame = Frame::new(size.cols, size.rows).with_colors(colors);
             }
         }
         if power_check.elapsed() > Duration::from_secs(30) {

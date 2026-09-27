@@ -130,3 +130,13 @@ fn bread(f: &mut Frame, cam: &Cam, theme: &Theme) {
     let ridge: Vec<V3> = (0..=8).map(|j| BREAD + v3(-hx + 2.0 * hx * j as f32 / 8.0, h + 0.035, 0.0)).collect();
     poly3(f, cam, &ridge, false, 0.55, c);
 }
+
+/// Sugar on a fruit: a few grains twinkling just above it.
+pub fn sugar(f: &mut Frame, cam: &Cam, theme: &Theme, at: V3, t: f32) {
+    for i in 0..14u32 {
+        let (a, b, e) = (hash01(i + 5000), hash01(i + 6000), hash01(i + 7000));
+        let p = at + v3((a - 0.5) * 0.08, 0.01 + b * 0.03, (e - 0.5) * 0.06);
+        let tw = 0.5 + 0.5 * (t * (3.0 + 4.0 * a) + e * TAU).sin();
+        point3(f, cam, p, 0.4 + 0.6 * tw, theme.rain_head);
+    }
+}

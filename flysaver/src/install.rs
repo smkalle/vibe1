@@ -213,6 +213,32 @@ pub fn doctor() -> bool {
             brain.n, brain.edges, brain.weights_fnv.0
         ),
     );
+    let mem = crate::memory::path();
+    let critic = brain.sets.get(crate::learner::CRITIC).map_or(0, |v| v.len());
+    match crate::memory::Memory::load(&mem, brain.weights_fnv.0, brain.seam.len(), critic) {
+        Ok(m) => {
+            let changed = m.efficacy.iter().zip(&brain.seam.efficacy0).filter(|(a, b)| (*a - *b).abs() > 1e-9).count();
+            let p = |x: f32| if x.is_nan() { "?".to_string() } else { format!("{x:.2}") };
+            check(
+                true,
+                true,
+                format!(
+                    "memory: {} lessons ({} sugar, {} blows), {} of {} synapses changed, sugar on the {}, p banana {} / bread {} ({})",
+                    m.lessons,
+                    m.rewards,
+                    m.blows,
+                    changed,
+                    brain.seam.len(),
+                    if m.sugar == 1 { "bread" } else { "banana" },
+                    p(m.last_p[0]),
+                    p(m.last_p[1]),
+                    mem.display()
+                ),
+            );
+        }
+        Err(e) if mem.exists() => check(false, true, format!("memory at {} unusable: {e} (flysaver forget clears it)", mem.display())),
+        Err(_) => check(true, true, format!("memory: none yet, the fly is naive ({})", mem.display())),
+    }
     let (cfg0, _) = config::load();
     check(true, true, format!("palette: {}", crate::theme::Theme::load(cfg0.palette).origin));
 

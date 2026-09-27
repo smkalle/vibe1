@@ -24,7 +24,7 @@
   ﾂ ﾓ        ﾋ <         ⢸              ⡇   ⠘⢦3⠉⠁< ⢸ﾂ   ⣀⣀⡠⠤⠤⢺ｱ⠊⠉⠉⠁   ⡇      ⡇     ⢸⣀⣀⡀      ｶ⠈⠉⠒⠒⠤⢄
   ﾌ 8        ﾌ ﾉ          ⡇         ⠠   ⡇   ⢀⣠⣤⣤⠴ﾄ⠖⢾⠶⠮⠭⣉⡀ﾅ   ⢸ｲ      ⢰⠁    ⣀⣀⡧⠤⠔⣒⣊⠭⡯⣔⡷⣬⣉⡒⠤⢄⣀ ﾀ      
   ｷ ﾉ        ｲ            ⡇       ⢀⣀⣀⠤⠤⠤⡗⢲⠞⠉⠉⠁     ⢸ｺ   ⠉⠒⢤  ⢸ﾋ   ⢀⣀⡠⢼⠤⠒⣒⣉⠭⠤⠒⡗⠉⠉ ⣀⡠⢇⡇⣿⢿⢷⣮⣙⠢⠬⣉⡗⠤⢄⣀   
-  brain-piloted · smelling · 0.30 m/s · 92 cm up · 203 Hz · hunger 0.76 · bread⠉⠉   ⡏⣿⢺⠿⣍⡾⣽⣿⢶⡯⣵⠒⠤⣉⡑⠢
+  brain-piloted · smelling · 0.30 m/s · 92 cm up · 203 Hz · hunger 0.76 · bread⠉⠉   ⡏⣿⢺⠿⣝⡿⣿⣿⢶⡯⣵⠒⠤⣉⡑⠢
   brain live · 60,000 neurons settling · 88 active · camera brain · 1 s saccade · 5 s saccade · 5…⠈⠉
-  ﾑ ﾉ        ｽ        ｼ   ⡇             ⡇ ⠉⠢⠤⣀⣀⡀   ⢸ﾃ⣀⣀⡠⠤⠊⠁⣀⡠⢧ｺ⠒⠪⠉ ⢺⢸⡏⡗⢍⠓⢦⣀       ⠈⢲⢵⣝⣜⠤⠔⠒⠉⠁ ｵ⠉⠒⠤⣀  
+  memory 0 lessons · 0 synapses changed · sugar on the banana · p banana ? / bread ?⢵⣝⣜⠤⠔⠒⠉⠁ ｵ⠉⠒⠤⣀  
   ｲ ｻ          after Cadence · Pragma Research · connectome: BANC release 888 (CC BY)⡇⡏⠒⠤⣀    ⠈   ⠉⠑

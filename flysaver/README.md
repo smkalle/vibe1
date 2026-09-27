@@ -15,6 +15,11 @@ drawn in truecolor text and braille. The scene has four parts:
 - **the brain flies the fly.** Its real output neurons steer: DNa02 turns
   it, the giant fibre fires it out of the way of a swatter, and over a fruit
   the mushroom body decides whether to land or leave
+- **it learns, and remembers.** Sugar sits on one fruit. Each decision
+  over a fruit is a lesson, and the library's actor-critic rewires the
+  Kenyon-cell → MBON synapses (the fly's olfactory memory). The memory is
+  saved between idle sessions, so the fly on your screen gets its own
+  history
 - a red-eyed mutant: in the Matrix, green is normal
 
 ![The nervous system view](screenshots/brain.png)
@@ -116,6 +121,9 @@ first-class hook.
 | `pilot` | `"brain"` | the live brain's output neurons steer, or `"instincts"` for the procedural layer alone (the original's control condition). `brain` needs `brain = "live"` |
 | `threats` | `true` | a swatter comes for a sitting fly every 40–90 s |
 | `eyes` | `"red"` | the red-eyed mutant, or `"theme"` for the theme's firing colour |
+| `learning` | `true` | lessons change the Kenyon-cell → MBON synapses; `false` keeps the measured seam fixed |
+| `remember` | `true` | load and save the fly's memory in `~/.local/state/flysaver/memory.bin` |
+| `sugar_minutes` | `20` | minutes of screensaver time before the sugar moves to the other fruit (5–240) |
 | `glitch` | `true` | the occasional stutter and jitter |
 | `hud` | `true` | title, status line, credits |
 
@@ -198,6 +206,62 @@ dopamine (PPL1) lights up. The HUD shows the brain's latest decision in the
 eye colour, for example `› giant fibre 0.537 → escape` or
 `› mushroom body: bread, approach (p 0.70)`.
 
+## It learns, and remembers
+
+This is the original's lesson loop (`web/life.js`, `web/learner.js`). A
+hungry fly hovers over a fruit for a second until its brain has settled
+into the smell, and then the mushroom body decides: approach or avoid.
+That decision is a **lesson**, and its outcome teaches the brain:
+
+| Outcome | Reward |
+|---|---|
+| lands on the sugared fruit (and feeds) | +1 |
+| leaves an empty fruit, or avoided one | 0 |
+| the swatter strikes it while it sits there | −1 |
+
+**The rule.** The library's actor-critic (`src/learner.rs`, ported from
+`web/learner.js` with the page's settings):
+- Two nudged settles at the decision give every Kenyon-cell → MBON synapse
+  an eligibility trace.
+- The dopamine is the temporal-difference error.
+- Each of the 16,795 synapses moves by η × dopamine × trace.
+
+**Sugar.** It sits on one fruit, marked with a twinkle, and moves after
+`sugar_minutes` of screensaver time, so the fly has to relearn.
+
+**Memory.** The learned synapses, the critic, where the sugar is and the
+lesson counts are saved to `~/.local/state/flysaver/memory.bin`:
+- after every lesson and on exit
+- loaded at the start of every idle session
+- refused if it was made for a different brain
+- erased with `flysaver forget`
+- reported by `flysaver doctor`
+
+With several monitors, each runs its own fly, and the last one to save wins.
+
+**Check it without waiting for idle:**
+
+```bash
+flysaver train --minutes 15          # headless, logs every decision and lesson
+flysaver train --minutes 60 --save   # the same, with your saved memory
+```
+
+Here's a real run (seed 3, 15 minutes, sugar on the bread):
+
+```
+  14.8s  mushroom body: bread, approach (p 0.34)
+  16.6s  lesson: bread, sugar +1 (dopamine +1.00)
+  45.4s  mushroom body: banana, approach (p 0.36)
+  49.5s  lesson: banana, struck there -1 (dopamine -1.00)
+  73.8s  mushroom body: bread, approach (p 0.35)
+  77.2s  lesson: bread, sugar +1 (dopamine +0.99)
+  98.4s  mushroom body: bread, approach (p 0.55)
+  ...
+done in 38 s: 37 lessons (14 sugar, 1 blows), 9747 of the 16,795 synapses changed; sugar on the bread
+approach p, banana  first 3 decisions 0.36  ->  last 3 0.38   (15 decisions)
+approach p, bread   first 3 decisions 0.45  ->  last 3 0.80   (22 decisions)
+```
+
 **The eyes.** They're red. In real *Drosophila*, red eyes are the wild type,
 and Morgan's famous 1910 mutant was the *white*-eyed one. But in the Matrix
 green is normal, so this fly is the mutant. `eyes = "theme"` restores the
@@ -212,7 +276,8 @@ These numbers come from `flysaver bench --size 230x65`, which is about a
 |---|---|---|
 | CPU per frame | 2.1–2.2 ms (6.3–6.6% of one core at 30 fps) | 0.6–0.65 ms (1.8–2.0%) |
 | Output to the terminal (truecolor) | 0.48–0.58 MB/s | 0.42–0.61 MB/s |
-| Peak memory | 50.5 MB | smaller (the brain isn't loaded) |
+| Peak memory | 56.2 MB | smaller (the brain isn't loaded) |
+| A mushroom-body decision (learning) | about 29 ms, once per lesson (every 20–30 s) | not run |
 | Start to first frame | about 110 ms (load, then 40 warm-up steps) | faster |
 | Exit | under 2 ms after a key or mouse movement; about 45 ms after focus leaves | same |
 
@@ -228,6 +293,8 @@ per frame. 256-colour mode writes about a third less, for a little more CPU.
 
 | File | Role |
 |---|---|
+| `src/learner.rs` | The mushroom body's actor-critic, ported from the original's `web/learner.js`. `tests/learner_cases.txt` (recorded by `tools/record_learner.mjs` from the original) holds it to 7.6e-17. |
+| `src/memory.rs` | The fly's memory file: learned synapses, critic, sugar and counters. |
 | `src/sim.rs` (instinct layer) | The fly's procedural life: fly, approach a smell, land, sit, groom, feed, take off. Rates follow the original's ethogram (about 0.45 saccades per second of flight, 5–15 s bouts). Also the camera director. |
 | `src/neuro.rs` | The Cadence rate model on the 60,000-neuron sub-net, ported from the original's `web/brain.js`. |
 | `src/senses.rs` | The fly's state mapped onto its afferents, ported from the original's `web/senses.js` and `web/life.js`, including the swatter's looming. |
@@ -261,7 +328,8 @@ After an intentional visual change, regenerate the golden frames with
   [github.com/Jarikononen/cadence-examples](https://github.com/Jarikononen/cadence-examples)
   under the MIT licence
   ([notice](NOTICE-cadence-examples.txt)). `src/neuro.rs` and `src/senses.rs`
-  are ports of its `web/brain.js`, `web/senses.js` and `web/life.js`, and
+  are ports of its `web/brain.js`, `web/senses.js` and `web/life.js`,
+  `src/learner.rs` of its `web/learner.js`, and
   `tests/parity_cases.txt` is its `tests/parity_cases.json`. The scene, the
   palette and the behaviour rates follow it.
 - The neurons, their positions and their wiring come from BANC release 888

@@ -7,6 +7,8 @@
 
 use crate::fb::Frame;
 use crate::math::{rot_y, v3, V3};
+use crate::learner::{self, Learner};
+use crate::memory::Memory;
 use crate::neuro;
 use crate::senses::{self, Motion};
 use crate::raster::{line3, Cam};
@@ -110,6 +112,8 @@ pub struct Live {
     /// Readouts (means of READOUTS) now, and at level-flight rest after warm-up.
     pub read: [f64; 9],
     baseline: Option<[f64; 9]>,
+    /// The mushroom body's actor-critic (Phase 3); None keeps the measured seam fixed.
+    pub learner: Option<Learner>,
 }
 
 impl Live {
@@ -139,6 +143,36 @@ impl Live {
         ea / (ea + ev)
     }
 
+    /// The mushroom body decides approach (true) or avoid with uniform draw `u`. With a
+    /// learner this is its act (and the decision's eligibility is kept for the outcome).
+    pub fn decide(&mut self, u: f64) -> (bool, f64) {
+        match &mut self.learner {
+            Some(l) => {
+                let d = l.act(&self.net, u);
+                (d.choice == 0, d.p_approach)
+            }
+            None => {
+                let p = self.p_approach();
+                (u < p, p)
+            }
+        }
+    }
+
+    /// The outcome of the last decision: the learner's lesson, if it is learning.
+    pub fn outcome(&mut self, reward: f64) -> Option<learner::Lesson> {
+        let l = self.learner.as_mut()?;
+        l.learn(&mut self.net, reward, true)
+    }
+
+    pub fn remember(&mut self, m: &Memory) {
+        if let Some(l) = &mut self.learner {
+            l.efficacy = m.efficacy.clone();
+            l.w_critic = m.w_critic.clone();
+            l.b_critic = m.b_critic;
+            l.apply(&mut self.net);
+        }
+    }
+
     pub fn giant_fibre(&self) -> f64 {
         self.read[4]
     }
@@ -159,11 +193,15 @@ pub struct Brain {
 }
 
 impl Brain {
-    pub fn new(points: usize, live: bool, steps_per_frame: usize) -> Brain {
+    pub fn new(points: usize, live: bool, steps_per_frame: usize, learning: bool) -> Brain {
         let net = load(points);
         let n = net.regions.len().max(18);
-        let live = live.then(|| Live {
-            net: neuro::Brain::load(),
+        let live = live.then(|| {
+            let brain = neuro::Brain::load();
+            let learner = learning.then(|| Learner::new(&brain));
+            Live {
+            net: brain,
+            learner,
             motion: Motion::default(),
             steps_per_frame: steps_per_frame.max(1),
             warm: false,
@@ -171,7 +209,7 @@ impl Brain {
             active: 0,
             read: [0.0; 9],
             baseline: None,
-        });
+        }});
         Brain { net, act: vec![0.0; n], wave: 2.0, angle: 0.0, bucket: 0, bucket_t: 0.0, live }
     }
 

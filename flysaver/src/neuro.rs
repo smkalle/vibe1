@@ -42,7 +42,30 @@ pub struct Brain {
     pub sets: HashMap<String, Vec<u32>>,
     /// FNV-1a of the rebuilt weights and the value the asset was baked with.
     pub weights_fnv: (u64, u64),
+    /// The plastic synapses: Kenyon cells onto MBONs, the memory site the learner moves.
+    pub seam: Seam,
 }
+
+/// The Kenyon-cell -> MBON synapses in the library's (receiver-major) order, with what
+/// the learner needs: sender, receiver, where the weight lives, the weight's factor, and
+/// the efficacy the asset starts from (the naive seam).
+pub struct Seam {
+    pub pre: Vec<u32>,
+    pub post: Vec<u32>,
+    pos: Vec<u32>,
+    factor: Vec<f64>,
+    pub efficacy0: Vec<f64>,
+}
+
+impl Seam {
+    pub fn len(&self) -> usize {
+        self.pre.len()
+    }
+}
+
+/// The plastic seam of "A fly in the Matrix": synapses from these senders onto these receivers.
+const SEAM_PRE: &str = "kc";
+const SEAM_POST: &str = "mbon";
 
 struct Reader<'a> {
     b: &'a [u8],
@@ -166,11 +189,13 @@ impl Brain {
         }
         let mut fill: Vec<u32> = out_ptr[..n].to_vec();
         let (mut out_post, mut out_w) = (vec![0u16; edges], vec![0.0f64; edges]);
+        let mut pos_of_edge = vec![0u32; edges];
         for i in 0..n {
             for e in row_ptr[i] as usize..row_ptr[i + 1] as usize {
                 let k = &mut fill[pre[e] as usize];
                 out_post[*k as usize] = i as u16;
                 out_w[*k as usize] = w[e];
+                pos_of_edge[e] = *k;
                 *k += 1;
             }
         }
@@ -200,6 +225,31 @@ impl Brain {
             sets.insert(name, idx);
         }
 
+        // The plastic seam, in the library's synapse order (by receiver, then sender).
+        let in_set = |name: &str| {
+            let mut m = vec![false; n];
+            for &i in sets.get(name).map(|v: &Vec<u32>| v.as_slice()).unwrap_or(&[]) {
+                m[i as usize] = true;
+            }
+            m
+        };
+        let (is_pre, is_post) = (in_set(SEAM_PRE), in_set(SEAM_POST));
+        let mut seam = Seam { pre: vec![], post: vec![], pos: vec![], factor: vec![], efficacy0: vec![] };
+        for i in 0..n {
+            if !is_post[i] {
+                continue;
+            }
+            for e in row_ptr[i] as usize..row_ptr[i + 1] as usize {
+                if is_pre[pre[e] as usize] {
+                    seam.pre.push(pre[e] as u32);
+                    seam.post.push(i as u32);
+                    seam.pos.push(pos_of_edge[e]);
+                    seam.factor.push(gain * count[e] as f64 * log_gain[pre[e] as usize].exp());
+                    seam.efficacy0.push(efficacy[e]);
+                }
+            }
+        }
+
         let rest = 1.0 / (1.0 + (slope * threshold).exp());
         Some(Brain {
             n,
@@ -222,6 +272,7 @@ impl Brain {
             pos,
             sets,
             weights_fnv: (fnv, fnv_baked),
+            seam,
         })
     }
 
@@ -261,18 +312,71 @@ impl Brain {
     }
 
     /// One step of the neuron model under the current drive.
-    pub fn step(&mut self) {
-        self.total.iter_mut().for_each(|t| *t = 0.0);
-        for j in 0..self.n {
-            let sj = self.s[j];
+    /// Synaptic input to every neuron from activations `s`, into `total`.
+    fn sums(&self, s: &[f64], total: &mut [f64]) {
+        total.iter_mut().for_each(|t| *t = 0.0);
+        for (j, &sj) in s.iter().enumerate() {
             if sj == 0.0 {
                 continue; // adds exact zeros only
             }
             let (a, b) = (self.out_ptr[j] as usize, self.out_ptr[j + 1] as usize);
             for (post, w) in self.out_post[a..b].iter().zip(&self.out_w[a..b]) {
-                self.total[*post as usize] += sj * w;
+                total[*post as usize] += sj * w;
             }
         }
+    }
+
+    /// Set a plastic synapse's efficacy; its weight is rebuilt as the library composes it.
+    pub fn set_efficacy(&mut self, k: usize, efficacy: f64) {
+        self.out_w[self.seam.pos[k] as usize] = self.seam.factor[k] * efficacy;
+    }
+
+    /// The learner's nudged phase (brain.js settleNudged): settle copies of the state with a
+    /// cross-entropy push of strength `beta` on `outputs` toward the one-hot `target`, until no
+    /// activation moves by `tolerance`. The live state is untouched.
+    pub fn settle_nudged(&self, outputs: &[usize], target: &[f64], beta: f64, temperature: f64, steps: usize, tolerance: f64) -> Vec<f64> {
+        let (mut v, mut s) = (self.v.clone(), self.s.clone());
+        let mut total = vec![0.0; self.n];
+        let mut p = vec![0.0; outputs.len()];
+        for _ in 0..steps {
+            let mut zmax = f64::NEG_INFINITY;
+            for &o in outputs {
+                zmax = zmax.max(s[o] / temperature);
+            }
+            let mut sum = 0.0;
+            for (j, &o) in outputs.iter().enumerate() {
+                p[j] = (s[o] / temperature - zmax).exp();
+                sum += p[j];
+            }
+            for pj in p.iter_mut() {
+                *pj /= sum;
+            }
+            self.sums(&s, &mut total);
+            for (j, &o) in outputs.iter().enumerate() {
+                total[o] += beta * (target[j] - p[j]);
+            }
+            let mut movement = 0.0f64;
+            for i in 0..self.n {
+                let prev = s[i];
+                let mut t = total[i];
+                t += self.drive[i] + self.bias[i];
+                t -= v[i];
+                t *= self.dt;
+                v[i] += t;
+                s[i] = self.activation(v[i]);
+                movement = movement.max((s[i] - prev).abs());
+            }
+            if movement < tolerance {
+                break;
+            }
+        }
+        s
+    }
+
+    pub fn step(&mut self) {
+        let mut total = std::mem::take(&mut self.total);
+        self.sums(&self.s, &mut total);
+        self.total = total;
         for i in 0..self.n {
             let mut t = self.total[i];
             t += self.drive[i] + self.bias[i];

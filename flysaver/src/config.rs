@@ -82,8 +82,22 @@ pub enum CameraMode {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Palette {
+    /// The Omarchy theme, or Matrix green when the theme has no accent colour.
     Theme,
+    /// The Omarchy theme even when it is grey (vantablack, white, solitude).
+    ThemeStrict,
     Matrix,
+}
+
+impl Palette {
+    pub fn parse(s: &str) -> Option<Palette> {
+        Some(match s {
+            "theme" => Palette::Theme,
+            "theme-strict" => Palette::ThemeStrict,
+            "matrix" => Palette::Matrix,
+            _ => return None,
+        })
+    }
 }
 
 /// How colours reach the terminal.
@@ -181,10 +195,9 @@ impl Config {
                     Some(c) => { self.camera = c; true }
                     None => false,
                 },
-                ("palette", Value::Str(s)) => match s.as_str() {
-                    "theme" => { self.palette = Palette::Theme; true }
-                    "matrix" => { self.palette = Palette::Matrix; true }
-                    _ => false,
+                ("palette", Value::Str(s)) => match Palette::parse(s) {
+                    Some(p) => { self.palette = p; true }
+                    None => false,
                 },
                 ("colors", Value::Str(s)) => match Colors::parse(s) {
                     Some(c) => { self.colors = c; true }

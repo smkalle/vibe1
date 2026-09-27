@@ -100,7 +100,7 @@ first-class hook.
 | `layers` | `["rain","room","brain","fly","hud"]` | add `"logo"` to show your `screensaver.txt` with the rain parting around it |
 | `brain_points` | `8000` | 500–20000 neurons |
 | `camera` | `"cycle"` | `follow`, `room`, `brain`, or `cycle` through them every 30–60 s |
-| `palette` | `"theme"` | the current Omarchy theme, or `"matrix"` for the original's `#39ff6a` |
+| `palette` | `"theme"` | the current Omarchy theme; themes whose accent is grey (vantablack, white, solitude) get the original's `#39ff6a` instead. `"theme-strict"` follows even a grey theme; `"matrix"` always uses the green |
 | `colors` | `"auto"` | `"truecolor"`, `"256"`, or `auto`: truecolor when `COLORTERM` is `truecolor`/`24bit`, else 256 |
 | `glitch` | `true` | the occasional stutter and jitter |
 | `hud` | `true` | title, status line, credits |

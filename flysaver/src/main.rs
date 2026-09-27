@@ -39,7 +39,7 @@ usage:
   flysaver about           credits and licences
 
 options (override ~/.config/omarchy/flysaver.toml):
-  --fps N  --camera cycle|follow|room|brain  --palette theme|matrix  --colors auto|truecolor|256
+  --fps N  --camera cycle|follow|room|brain  --palette theme|theme-strict|matrix  --colors auto|truecolor|256
   --layers rain,room,brain,fly,hud,logo  --seed N
   --size COLSxROWS  --time SECONDS  --frames N  --html   (snapshot/bench)
 ";
@@ -80,11 +80,7 @@ fn parse_args(cfg: &mut Config) -> Result<Opts, String> {
             "--fps" => cfg.fps = val("--fps")?.parse::<f32>().map_err(|e| e.to_string())?.clamp(5.0, 60.0),
             "--camera" => cfg.camera = config::parse_camera(&val("--camera")?).ok_or("unknown camera")?,
             "--palette" => {
-                cfg.palette = match val("--palette")?.as_str() {
-                    "theme" => Palette::Theme,
-                    "matrix" => Palette::Matrix,
-                    _ => return Err("unknown palette".into()),
-                }
+                cfg.palette = Palette::parse(&val("--palette")?).ok_or("palette is theme, theme-strict or matrix")?
             }
             "--colors" => cfg.colors = Colors::parse(&val("--colors")?).ok_or("colors is auto, truecolor or 256")?,
             "--layers" => cfg.layers = val("--layers")?.split(',').map(|s| s.trim().to_string()).collect(),

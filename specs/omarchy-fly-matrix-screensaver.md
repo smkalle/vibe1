@@ -322,3 +322,18 @@ The output budget is missed because the orbiting camera moves every wireframe li
 - Install, shim, fallback and uninstall: `tests/install_roundtrip.sh`
 
 Not yet verified on a real Omarchy/Hyprland desktop. This build environment has no display.
+
+### 256-colour mode (follow-up)
+
+`colors = "auto" | "truecolor" | "256"`, default `auto`. `auto` gives truecolor when `COLORTERM` is `truecolor` or `24bit`, and 256 otherwise.
+
+- **Colour matching:** it uses palette indices 16–255 and matches in OKLab by hue angle (±30°), then lightness. Greys only match greys. Colours too dim for the darkest matching shade become black and aren't drawn.
+- **Diffing:** the diff compares palette indices, so a cell is only rewritten when its visible colour changes.
+- **Measured at 230×65:**
+
+| | truecolor | 256 |
+|---|---|---|
+| Output | 0.40–0.60 MB/s | 0.25–0.41 MB/s |
+| CPU | 0.9–1.0 ms/frame | 1.05–1.1 ms/frame |
+
+256 mode cuts output by about a third. That's short of the < 300 KB/s estimated in the plan; only the brain view gets there. Most of the remaining output is braille characters that change as the camera moves.

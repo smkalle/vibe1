@@ -20,11 +20,14 @@ BIN = sys.argv[1] if len(sys.argv) > 1 else "target/release/flysaver"
 RESTORE = [b"\x1b[?1003l", b"\x1b[?25h", b"\x1b[?1049l", b"\x1b]111\x07"]
 
 
-def spawn(args, cols=100, rows=30):
+def spawn(args, cols=100, rows=30, colorterm="truecolor"):
     pid, fd = pty.fork()
     if pid == 0:
         env = dict(os.environ)
         env.pop("HYPRLAND_INSTANCE_SIGNATURE", None)
+        env.pop("COLORTERM", None)
+        if colorterm:
+            env["COLORTERM"] = colorterm
         os.execve(BIN, [BIN] + args, env)
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
     return pid, fd
@@ -60,9 +63,11 @@ def wait_exit(pid, fd, secs=1.0):
     return None, None, out
 
 
-def case(name, args, trigger):
-    pid, fd = spawn(args)
+def case(name, args, trigger, colorterm="truecolor", want=b"\x1b[38;2;", forbid=b"\x1b[38;5;"):
+    pid, fd = spawn(args, colorterm=colorterm)
     first = drain(fd, 0.8)
+    assert want in first, f"{name}: expected {want!r} colour codes"
+    assert forbid not in first, f"{name}: unexpected {forbid!r} colour codes"
     assert b"\x1b[?1049h" in first and b"\x1b[?1003h" in first, f"{name}: terminal not set up"
     assert b"BANC" in first, f"{name}: no HUD drawn"
     trigger(pid, fd)
@@ -79,4 +84,8 @@ case("mouse motion", ["preview", "--seed", "2"], lambda pid, fd: os.write(fd, b"
 case("SIGTERM", ["preview", "--seed", "3"], lambda pid, fd: os.kill(pid, signal.SIGTERM))
 case("SIGHUP", ["preview", "--seed", "4"], lambda pid, fd: os.kill(pid, signal.SIGHUP))
 case("run mode key", ["--seed", "5"], lambda pid, fd: os.write(fd, b"\r"))
+case("--colors 256", ["preview", "--seed", "6", "--colors", "256"], lambda pid, fd: os.write(fd, b"q"),
+     want=b"\x1b[38;5;", forbid=b"\x1b[38;2;")
+case("auto, no COLORTERM", ["preview", "--seed", "7"], lambda pid, fd: os.write(fd, b"q"),
+     colorterm=None, want=b"\x1b[38;5;", forbid=b"\x1b[38;2;")
 print("all lifecycle checks passed")

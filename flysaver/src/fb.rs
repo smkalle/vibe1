@@ -1,7 +1,9 @@
 //! Framebuffer: a braille sub-pixel canvas for the vector layers, a glyph layer for
 //! the rain, an overlay for text, and a diffing ANSI writer.
 
-use crate::theme::Rgb;
+use crate::config::Colors;
+use crate::theme::{xterm, Rgb};
+use std::collections::HashMap;
 use std::fmt::Write as _;
 
 /// Sub-pixels dimmer than this are not drawn.
@@ -18,14 +20,36 @@ impl Glyph {
     pub const EMPTY: Glyph = Glyph { ch: ' ', fg: Rgb(0, 0, 0), i: 0.0 };
 }
 
+/// A composed cell. In 256-colour mode `fg` is the palette colour the terminal
+/// will show and `idx` its index, so the diff compares what is actually visible.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Out {
     pub ch: char,
     pub fg: Rgb,
+    pub idx: u8,
 }
 
 impl Out {
-    pub const BLANK: Out = Out { ch: ' ', fg: Rgb(0, 0, 0) };
+    pub const BLANK: Out = Out { ch: ' ', fg: Rgb(0, 0, 0), idx: 0 };
+
+    pub fn new(ch: char, fg: Rgb) -> Out {
+        Out { ch, fg, idx: 0 }
+    }
+}
+
+/// Remembers palette lookups; the search runs once per distinct colour.
+#[derive(Default)]
+struct Palette256 {
+    cache: HashMap<Rgb, u8>,
+}
+
+impl Palette256 {
+    fn get(&mut self, c: Rgb) -> u8 {
+        if self.cache.len() > 8192 {
+            self.cache.clear();
+        }
+        *self.cache.entry(c).or_insert_with(|| xterm::index(c))
+    }
 }
 
 pub struct Frame {
@@ -41,6 +65,9 @@ pub struct Frame {
     /// Cells the rain must leave alone (behind the logo).
     pub rain_mask: Vec<bool>,
     pub out: Vec<Out>,
+    /// Truecolor or 256 (never Auto: resolve before rendering).
+    pub colors: Colors,
+    palette: Palette256,
 }
 
 impl Frame {
@@ -57,7 +84,14 @@ impl Frame {
             overlay: vec![None; n],
             rain_mask: vec![false; n],
             out: vec![Out::BLANK; n],
+            colors: Colors::TrueColor,
+            palette: Palette256::default(),
         }
+    }
+
+    pub fn with_colors(mut self, colors: Colors) -> Frame {
+        self.colors = colors;
+        self
     }
 
     pub fn sub_w(&self) -> usize {
@@ -99,7 +133,7 @@ impl Frame {
                 break;
             }
             let idx = row as usize * self.cols + c as usize;
-            self.overlay[idx] = if ch == '\0' { None } else { Some(Out { ch, fg }) };
+            self.overlay[idx] = if ch == '\0' { None } else { Some(Out::new(ch, fg)) };
         }
     }
 
@@ -131,12 +165,21 @@ impl Frame {
                 }
                 let rain = self.rain[idx];
                 self.out[idx] = if bits != 0 && vmax >= rain.i * 0.9 {
-                    Out { ch: char::from_u32(0x2800 + bits).unwrap_or(' '), fg: vcol.scale(levels(0.25 + 0.75 * vmax)) }
+                    Out::new(char::from_u32(0x2800 + bits).unwrap_or(' '), vcol.scale(levels(0.25 + 0.75 * vmax)))
                 } else if rain.i > 0.02 {
-                    Out { ch: rain.ch, fg: rain.fg.scale(levels(rain.i)) }
+                    Out::new(rain.ch, rain.fg.scale(levels(rain.i)))
                 } else {
                     Out::BLANK
                 };
+            }
+        }
+        if self.colors == Colors::Xterm256 {
+            for o in self.out.iter_mut() {
+                if o.ch == ' ' {
+                    continue;
+                }
+                let i = self.palette.get(o.fg);
+                *o = if i == 16 { Out::BLANK } else { Out { ch: o.ch, fg: xterm::rgb(i), idx: i } };
             }
         }
     }
@@ -241,7 +284,7 @@ impl Screen {
             self.rows = f.rows;
         }
         let mut cursor: Option<(usize, usize)> = None;
-        let mut color: Option<Rgb> = None;
+        let mut color: Option<(Rgb, u8)> = None;
         for row in 0..f.rows {
             for col in 0..f.cols {
                 let idx = row * f.cols + col;
@@ -264,9 +307,13 @@ impl Screen {
                         let _ = write!(self.buf, "\x1b[{};{}H", row + 1, col + 1);
                     }
                 }
-                if o.ch != ' ' && color != Some(o.fg) {
-                    let _ = write!(self.buf, "\x1b[38;2;{};{};{}m", o.fg.0, o.fg.1, o.fg.2);
-                    color = Some(o.fg);
+                if o.ch != ' ' && color != Some((o.fg, o.idx)) {
+                    if f.colors == Colors::Xterm256 {
+                        let _ = write!(self.buf, "\x1b[38;5;{}m", o.idx);
+                    } else {
+                        let _ = write!(self.buf, "\x1b[38;2;{};{};{}m", o.fg.0, o.fg.1, o.fg.2);
+                    }
+                    color = Some((o.fg, o.idx));
                 }
                 self.buf.push(o.ch);
                 cursor = Some((row, col + 1));
@@ -305,6 +352,27 @@ mod tests {
         assert_eq!(f.out[0].ch, '\u{2801}');
         assert_eq!(f.out[1].ch, 'ｱ');
         assert_eq!(f.out[2].ch, 'X');
+    }
+
+    #[test]
+    fn xterm256_frames_use_palette_codes_only() {
+        let mut f = Frame::new(6, 2).with_colors(Colors::Xterm256);
+        f.plot(0, 0, 1.0, Rgb(0x39, 0xff, 0x6a));
+        f.rain[2] = Glyph { ch: 'ｱ', fg: Rgb(0x39, 0xff, 0x6a), i: 0.5 };
+        f.text(0, 1, "ok", Rgb(0xc8, 0xff, 0xd8));
+        f.compose();
+        let out = Screen::new().render(&f).to_string();
+        assert!(out.contains("\x1b[38;5;"), "{out:?}");
+        assert!(!out.contains("38;2;"), "{out:?}");
+        assert!(f.out.iter().filter(|o| o.ch != ' ').all(|o| (17..=255).contains(&o.idx) && o.fg == xterm::rgb(o.idx)));
+    }
+
+    #[test]
+    fn xterm256_drops_cells_too_dim_to_show() {
+        let mut f = Frame::new(1, 1).with_colors(Colors::Xterm256);
+        f.rain[0] = Glyph { ch: 'ｱ', fg: Rgb(20, 40, 20), i: 0.1 };
+        f.compose();
+        assert_eq!(f.out[0], Out::BLANK);
     }
 
     #[test]

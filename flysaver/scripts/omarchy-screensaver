@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# flysaver shim. Installed to ~/.local/share/flysaver/bin, which
+# ~/.config/uwsm/env.d/99-flysaver puts first on the Hyprland session's PATH,
+# so Omarchy's omarchy-launch-screensaver runs this instead of the stock
+# omarchy-screensaver. Falls back to the stock one when flysaver is missing
+# or disabled (touch ~/.config/omarchy/flysaver.disabled).
+
+flysaver="$HOME/.local/bin/flysaver"
+
+if [[ -x $flysaver && ! -e $HOME/.config/omarchy/flysaver.disabled ]]; then
+  exec "$flysaver" "$@"
+fi
+
+self_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+IFS=: read -ra dirs <<<"$PATH"
+for dir in "${dirs[@]}"; do
+  [[ -n $dir && $(cd "$dir" 2>/dev/null && pwd -P) != "$self_dir" ]] || continue
+  [[ -x $dir/omarchy-screensaver ]] && exec "$dir/omarchy-screensaver" "$@"
+done
+
+echo "flysaver shim: no stock omarchy-screensaver found on PATH" >&2
+exit 1

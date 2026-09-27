@@ -6,7 +6,7 @@ pub mod hud;
 pub mod rain;
 pub mod room;
 
-use crate::config::Config;
+use crate::config::{BrainMode, Config};
 use crate::fb::Frame;
 use crate::raster::Cam;
 use crate::rng::Rng;
@@ -34,18 +34,21 @@ pub struct Scene {
     next_glitch: f32,
     /// Sub-pixel height / width, from the terminal's pixel size when it reports one.
     pub aspect: f32,
+    /// Show the live brain's wall-clock step cost on the HUD (off for deterministic snapshots).
+    pub show_timing: bool,
 }
 
 impl Scene {
     pub fn new(cfg: Config, theme: Theme, seed: u64) -> Scene {
+        let theme = if cfg.vivid { theme.vivid() } else { theme };
         let mut rng = Rng::new(seed);
         let fly = Fly::new(&mut rng);
         let director = Director::new(cfg.camera, &fly, &mut rng);
-        let brain = cfg.has_layer("brain").then(|| brain::Brain::new(cfg.brain_points));
+        let brain = cfg.has_layer("brain").then(|| brain::Brain::new(cfg.brain_points, cfg.brain == BrainMode::Live, cfg.brain_steps));
         let logo = if cfg.has_layer("logo") { hud::load_logo() } else { Vec::new() };
         let next_glitch = rng.range(20.0, 60.0);
         Scene {
-            rain: rain::Rain::new(cfg.rain_density, &cfg.rain_glyphs),
+            rain: rain::Rain::new(cfg.rain_density, &cfg.rain_glyphs, cfg.vivid),
             cfg,
             theme,
             fly,
@@ -56,6 +59,7 @@ impl Scene {
             glitch: None,
             next_glitch,
             aspect: 1.0,
+            show_timing: true,
             rng,
         }
     }
@@ -101,11 +105,13 @@ impl Scene {
         let d = (shot.target - shot.pos).len();
         cam.fog_near = d * 0.6;
         cam.fog_far = d + 4.0;
+        cam.fog_floor = if self.cfg.vivid { 0.35 } else { 0.12 };
         cam
     }
 
     pub fn draw(&self, f: &mut Frame) {
         f.clear();
+        f.floor = if self.cfg.vivid { 0.5 } else { 0.25 };
         f.rain_mask.iter_mut().for_each(|m| *m = false);
         if !self.logo.is_empty() {
             hud::logo(f, &self.theme, &self.logo);
@@ -132,6 +138,11 @@ impl Scene {
                 fly: &self.fly,
                 camera: self.director.name(),
                 neurons_drawn: self.brain.as_ref().map_or(0, |b| b.len()),
+                live: self.brain.as_ref().and_then(|b| b.live.as_ref()).map(|l| hud::LiveInfo {
+                    neurons: l.net.n,
+                    active: l.active,
+                    ms_per_step: self.show_timing.then_some(l.ms_per_step),
+                }),
                 jitter,
             };
             hud::draw(f, &self.theme, &info);

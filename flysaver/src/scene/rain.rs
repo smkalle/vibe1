@@ -8,6 +8,8 @@ const KATAKANA: &str = "ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂ�
 const ASCII: &str = "abcdefghijklmnopqrstuvwxyz0123456789Z:=*+-<>";
 /// The original textures its rain at 0.55 opacity; the trail never outshines the scene.
 const TRAIL: f32 = 0.42;
+/// Brighter trail and a full-strength head when colours are vivid.
+const VIVID_TRAIL: f32 = 0.65;
 
 struct Column {
     active: bool,
@@ -26,10 +28,11 @@ pub struct Rain {
     density: f32,
     tick: f32,
     pub frozen: f32,
+    vivid: bool,
 }
 
 impl Rain {
-    pub fn new(density: f32, style: &str) -> Rain {
+    pub fn new(density: f32, style: &str, vivid: bool) -> Rain {
         let set = if style == "ascii" { ASCII } else { KATAKANA };
         Rain {
             glyphs: set.chars().collect(),
@@ -40,6 +43,7 @@ impl Rain {
             density,
             tick: 0.0,
             frozen: 0.0,
+            vivid,
         }
     }
 
@@ -119,9 +123,10 @@ impl Rain {
                 }
                 let t = (head - y) as f32 / c.len;
                 f.rain[idx] = if y == head {
-                    Glyph { ch: self.cells[idx], fg: theme.rain_head, i: 0.8 }
+                    Glyph { ch: self.cells[idx], fg: theme.rain_head, i: if self.vivid { 1.0 } else { 0.8 } }
                 } else {
-                    Glyph { ch: self.cells[idx], fg: theme.rain, i: TRAIL * (1.0 - t).max(0.0).powf(1.6) }
+                    let trail = if self.vivid { VIVID_TRAIL } else { TRAIL };
+                    Glyph { ch: self.cells[idx], fg: theme.rain, i: trail * (1.0 - t).max(0.0).powf(1.6) }
                 };
             }
         }

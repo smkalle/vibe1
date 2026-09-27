@@ -1,9 +1,14 @@
 //! The connectome: every sampled neuron of the BANC 888 fly drawn where it sits,
-//! turning slowly like a hologram. Firing is decorative: region pulses tied to
-//! what the fly is doing, plus a wave running from the brain down the nerve cord.
+//! turning slowly like a hologram. In live mode (the default) the 60,000-neuron
+//! sub-net runs the Cadence rate model (crate::neuro), fed by the fly's senses
+//! (crate::senses), and every active neuron is drawn lit by its real activity over
+//! a dim whole-brain silhouette. In decorative mode the firing is region pulses
+//! tied to what the fly does, plus a wave down the nerve cord.
 
 use crate::fb::Frame;
 use crate::math::{rot_y, v3, V3};
+use crate::neuro;
+use crate::senses::{self, Motion};
 use crate::raster::{line3, Cam};
 use crate::rng::{hash01, Rng};
 use crate::sim::{Event, Fly, BRAIN_CENTER, BRAIN_SCALE};
@@ -65,6 +70,24 @@ pub fn parse(b: &[u8], max_points: usize) -> Option<Connectome> {
     Some(Connectome { pos, region, regions })
 }
 
+/// Steps run before the first frame so the net starts settled under the senses
+/// (about 8 time constants of the rate model).
+const WARM_UP: usize = 40;
+/// Activity below this is not drawn.
+const SHOW_LEVEL: f64 = 0.02;
+
+/// The live rate model and what it needs between frames.
+pub struct Live {
+    pub net: neuro::Brain,
+    motion: Motion,
+    steps_per_frame: usize,
+    warm: bool,
+    /// Smoothed wall-clock cost of one model step, in ms.
+    pub ms_per_step: f32,
+    /// Neurons at or above half activation (the original's "active" count).
+    pub active: usize,
+}
+
 pub struct Brain {
     net: Connectome,
     act: Vec<f32>,
@@ -72,17 +95,43 @@ pub struct Brain {
     angle: f32,
     bucket: u32,
     bucket_t: f32,
+    pub live: Option<Live>,
 }
 
 impl Brain {
-    pub fn new(points: usize) -> Brain {
+    pub fn new(points: usize, live: bool, steps_per_frame: usize) -> Brain {
         let net = load(points);
         let n = net.regions.len().max(18);
-        Brain { net, act: vec![0.0; n], wave: 2.0, angle: 0.0, bucket: 0, bucket_t: 0.0 }
+        let live = live.then(|| Live {
+            net: neuro::Brain::load(),
+            motion: Motion::default(),
+            steps_per_frame: steps_per_frame.max(1),
+            warm: false,
+            ms_per_step: 0.0,
+            active: 0,
+        });
+        Brain { net, act: vec![0.0; n], wave: 2.0, angle: 0.0, bucket: 0, bucket_t: 0.0, live }
     }
 
     pub fn len(&self) -> usize {
         self.net.pos.len()
+    }
+
+    fn step_live(live: &mut Live, dt: f32, fly: &Fly) {
+        let rates = live.motion.rates(fly, dt);
+        live.net.clear_stimuli();
+        for (name, level) in senses::sense(fly, rates) {
+            live.net.stimulate(name, level);
+        }
+        let steps = if live.warm { live.steps_per_frame } else { WARM_UP };
+        live.warm = true;
+        let t = std::time::Instant::now();
+        for _ in 0..steps {
+            live.net.step();
+        }
+        let ms = t.elapsed().as_secs_f32() * 1e3 / steps as f32;
+        live.ms_per_step = if live.ms_per_step == 0.0 { ms } else { live.ms_per_step * 0.9 + ms * 0.1 };
+        live.active = live.net.active_count(0.5);
     }
 
     fn kick(&mut self, r: u8, v: f32) {
@@ -93,6 +142,10 @@ impl Brain {
 
     pub fn step(&mut self, dt: f32, fly: &Fly, rng: &mut Rng) {
         self.angle = (self.angle + dt * 0.22) % TAU;
+        if let Some(live) = &mut self.live {
+            Brain::step_live(live, dt, fly);
+            return;
+        }
         for a in &mut self.act {
             *a *= (-dt * 1.8).exp();
         }
@@ -167,17 +220,30 @@ impl Brain {
             let act = self.act.get(r).copied().unwrap_or(0.0);
             let wave = (-((p.y - self.wave).powi(2)) / 0.004).exp() * if h < 0.5 { 0.8 } else { 0.0 };
             let spark = if hash01(k as u32 ^ bucket) < act * 0.35 { act } else { 0.0 };
-            let fire = spark.max(wave).min(1.0);
+            // Live mode: the silhouette stays dark; the model's neurons light up on top.
+            let fire = if self.live.is_some() { 0.0 } else { spark.max(wave).min(1.0) };
             // Most neurons sit in the optic lobes and central brain; thin those
             // harder so the nerve cord still reads.
             let keep_here = if r <= 3 { keep * 0.45 } else { (keep * 2.5).min(1.0) };
             if fire < 0.05 && h >= keep_here {
                 continue;
             }
-            let base = 0.2 + 0.25 * (h / keep_here.max(1e-3)).min(1.0);
+            let base = if self.live.is_some() { 0.1 + 0.12 * h } else { 0.2 + 0.25 * (h / keep_here.max(1e-3)).min(1.0) };
             let i = (base + 0.8 * fire) * cam.fog(z).max(0.4);
             let c = theme.wire.mix(theme.fire, fire);
             f.plot(x.round() as i32, y.round() as i32, i, c);
+        }
+        if let Some(live) = &self.live {
+            for (k, act) in live.net.s.iter().enumerate() {
+                if *act < SHOW_LEVEL {
+                    continue;
+                }
+                let w = BRAIN_CENTER + rot_y(live.net.pos[k] * s, a);
+                let Some((x, y, z)) = cam.project(w) else { continue };
+                let act = *act as f32;
+                let i = (0.45 + 0.55 * act) * cam.fog(z).max(0.6);
+                f.plot(x.round() as i32, y.round() as i32, i, theme.heat(act));
+            }
         }
         // The projector: a faint ring below the hologram.
         let base = BRAIN_CENTER - v3(0.0, s * 1.15, 0.0);

@@ -143,6 +143,15 @@ impl Colors {
     }
 }
 
+/// Where the brain's firing comes from.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BrainMode {
+    /// The Cadence rate model on the 60,000-neuron sub-net, fed by the fly's senses.
+    Live,
+    /// Region pulses tied to what the fly does; no model runs.
+    Decorative,
+}
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub fps: f32,
@@ -154,6 +163,9 @@ pub struct Config {
     pub camera: CameraMode,
     pub palette: Palette,
     pub colors: Colors,
+    pub brain: BrainMode,
+    pub brain_steps: usize,
+    pub vivid: bool,
     pub glitch: bool,
     pub hud: bool,
 }
@@ -170,6 +182,9 @@ impl Default for Config {
             camera: CameraMode::Cycle,
             palette: Palette::Theme,
             colors: Colors::Auto,
+            brain: BrainMode::Live,
+            brain_steps: 1,
+            vivid: true,
             glitch: true,
             hud: true,
         }
@@ -204,6 +219,13 @@ impl Config {
                     None => false,
                 },
                 ("colors", Value::Num(n)) if *n == 256.0 => { self.colors = Colors::Xterm256; true }
+                ("brain", Value::Str(s)) => match s.as_str() {
+                    "live" => { self.brain = BrainMode::Live; true }
+                    "decorative" => { self.brain = BrainMode::Decorative; true }
+                    _ => false,
+                },
+                ("brain_steps", Value::Num(n)) => { self.brain_steps = (*n as usize).clamp(1, 4); true }
+                ("vivid", Value::Bool(b)) => { self.vivid = *b; true }
                 ("glitch", Value::Bool(b)) => { self.glitch = *b; true }
                 ("hud", Value::Bool(b)) => { self.hud = *b; true }
                 _ => false,
@@ -280,6 +302,14 @@ mod tests {
         assert!(c.apply(&parse_flat_toml("colors = \"256\"\n")).is_empty());
         assert_eq!(c.colors, Colors::Xterm256);
         assert!(c.apply(&parse_flat_toml("colors = 256\n")).is_empty());
+    }
+
+    #[test]
+    fn brain_and_vivid_keys() {
+        let mut c = Config::default();
+        assert_eq!((c.brain, c.brain_steps, c.vivid), (BrainMode::Live, 1, true));
+        assert!(c.apply(&parse_flat_toml("brain = \"decorative\"\nbrain_steps = 9\nvivid = false\n")).is_empty());
+        assert_eq!((c.brain, c.brain_steps, c.vivid), (BrainMode::Decorative, 4, false));
     }
 
     #[test]

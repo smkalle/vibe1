@@ -204,6 +204,15 @@ pub fn doctor() -> bool {
 
     let colors = home().join(".local/state/omarchy/current/theme/colors.toml");
     check(colors.exists(), true, format!("theme colours at {}", colors.display()));
+    let brain = crate::neuro::Brain::load();
+    check(
+        brain.weights_fnv.0 == brain.weights_fnv.1,
+        false,
+        format!(
+            "live brain: {} neurons, {} synapse classes, weights rebuilt exactly (fnv {:016x})",
+            brain.n, brain.edges, brain.weights_fnv.0
+        ),
+    );
     let (cfg0, _) = config::load();
     check(true, true, format!("palette: {}", crate::theme::Theme::load(cfg0.palette).origin));
 

@@ -7,7 +7,9 @@ mod config;
 mod fb;
 mod hypr;
 mod install;
+mod learner;
 mod math;
+mod memory;
 mod neuro;
 mod raster;
 mod rng;
@@ -36,6 +38,8 @@ usage:
   flysaver install         install for the current user (no root, survives omarchy update)
   flysaver uninstall       remove everything install added (keeps your config)
   flysaver doctor          check the installation and the session
+  flysaver train           run the fly headless and log its lessons (--minutes N, --save)
+  flysaver forget          erase what the fly has learned
   flysaver snapshot        print one frame as text (for tests)
   flysaver bench           time the renderer
   flysaver about           credits and licences
@@ -72,6 +76,14 @@ feeds and aDN grooms, and over a fruit the mushroom body's MBON11 and MBON05
 decide approach or avoid (a softmax, T 0.3). Under these senses the speed,
 feeding and grooming neurons stay silent, so the instincts carry those.
 
+What it learns (learning = true, the default): each decision over a fruit is
+a lesson. Sugar where it lands is +1, an empty fruit left or avoided 0, the
+swatter striking it there -1. The library's actor-critic (the original's
+learner.js, held to it by a parity test) moves the 16,795 Kenyon-cell ->
+MBON synapses. The sugar moves every sugar_minutes, and what the fly has
+learned is kept in ~/.local/state/flysaver/memory.bin between idle sessions
+(flysaver forget erases it).
+
 What is supplied: the instinct layer (flight bouts, saccades, wall
 avoidance, sits), the senses as the original page feeds them (halteres,
 ocelli, optic flow, antennae, odours, sugar, touch, dopamine), the swatter
@@ -89,10 +101,12 @@ struct Opts {
     frames: usize,
     html: bool,
     swat: Option<f32>,
+    minutes: f32,
+    save: bool,
 }
 
 fn parse_args(cfg: &mut Config) -> Result<Opts, String> {
-    let mut o = Opts { cmd: "run".into(), seed: None, size: (120, 40), time: 12.0, frames: 300, html: false, swat: None };
+    let mut o = Opts { cmd: "run".into(), seed: None, size: (120, 40), time: 12.0, frames: 300, html: false, swat: None, minutes: 10.0, save: false };
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         let mut val = |name: &str| args.next().ok_or(format!("{name} needs a value"));
@@ -114,6 +128,8 @@ fn parse_args(cfg: &mut Config) -> Result<Opts, String> {
                 o.size = (c.parse().map_err(|_| "bad cols")?, r.parse().map_err(|_| "bad rows")?);
             }
             "--html" => o.html = true,
+            "--minutes" => o.minutes = val("--minutes")?.parse().map_err(|_| "bad minutes")?,
+            "--save" => o.save = true,
             "--swat" => o.swat = Some(val("--swat")?.parse().map_err(|_| "bad swat time")?),
             "--time" => o.time = val("--time")?.parse().map_err(|_| "bad time")?,
             "--frames" => o.frames = val("--frames")?.parse().map_err(|_| "bad frames")?,
@@ -156,6 +172,15 @@ fn main() {
             0
         }
         "bench" => bench(cfg, seed, opts.size, opts.frames),
+        "train" => train(cfg, seed, opts.minutes, opts.save),
+        "forget" => {
+            let p = memory::path();
+            match std::fs::remove_file(&p) {
+                Ok(()) => println!("forgot everything: removed {}", p.display()),
+                Err(_) => println!("nothing to forget ({} does not exist)", p.display()),
+            }
+            0
+        }
         "launch" => launch(),
         "install" => report(install::install()),
         "uninstall" => report(install::uninstall()),
@@ -255,6 +280,66 @@ fn swat_snapshot(cfg: Config, seed: u64, (cols, rows): (usize, usize), after: f3
     if html { f.to_html() } else { f.to_text() }
 }
 
+/// Headless: the whole scene with lessons for `minutes` of screensaver time, logging what
+/// the mushroom body decides and learns (the end-to-end check of Phase 3).
+fn train(cfg: Config, seed: u64, minutes: f32, save: bool) -> i32 {
+    let mut cfg = cfg;
+    cfg.glitch = false;
+    let mut scene = Scene::new(cfg, Theme::matrix(), seed);
+    scene.show_timing = false;
+    scene.start_memory(save.then(memory::path));
+    let dt = 1.0 / 30.0;
+    let frames = (minutes * 60.0 / dt) as usize;
+    let mut last: Option<(String, f32)> = None;
+    let mut decisions: [Vec<f32>; 2] = [vec![], vec![]];
+    let mut seen = [f32::NAN; 2];
+    println!("training {minutes} min, sugar on the {}{}", scene.sugar.name(), if save { ", with the saved memory" } else { "" });
+    let start = Instant::now();
+    for _ in 0..frames {
+        scene.step(dt, 80, 24);
+        if scene.note != last {
+            if let Some((text, t)) = &scene.note {
+                let keep = ["mushroom body", "lesson", "sugar", "giant fibre", "swatted", "remembers"];
+                if keep.iter().any(|k| text.contains(k)) {
+                    println!("{:>6.1}s  {text}", t);
+                }
+            }
+            last = scene.note.clone();
+        }
+        for (k, p) in scene.stats.last_p.iter().enumerate() {
+            if !p.is_nan() && p.to_bits() != seen[k].to_bits() {
+                decisions[k].push(*p);
+                seen[k] = *p;
+            }
+        }
+    }
+    let st = scene.stats;
+    println!(
+        "done in {:.0} s: {} lessons ({} sugar, {} blows), {} of the 16,795 synapses changed; sugar on the {}",
+        start.elapsed().as_secs_f32(),
+        st.lessons,
+        st.rewards,
+        st.blows,
+        st.changed,
+        scene.sugar.name()
+    );
+    let mean = |v: &[f32]| if v.is_empty() { f32::NAN } else { v.iter().sum::<f32>() / v.len() as f32 };
+    for (k, name) in ["banana", "bread"].iter().enumerate() {
+        let d = &decisions[k];
+        let n = d.len().min(3);
+        println!(
+            "approach p, {name:<6}  first {n} decisions {:.2}  ->  last {n} {:.2}   ({} decisions)",
+            mean(&d[..n]),
+            mean(&d[d.len() - n..]),
+            d.len()
+        );
+    }
+    if save {
+        scene.save_memory();
+    }
+    0
+}
+
 fn bench(cfg: Config, seed: u64, (cols, rows): (usize, usize), frames: usize) -> i32 {
     let fps = cfg.fps;
     let colors = cfg.colors.resolve_env();
@@ -303,6 +388,7 @@ fn run(cfg: Config, seed: u64, preview: bool) -> i32 {
     let colors = cfg.colors.resolve_env();
     let theme = Theme::load(cfg.palette);
     let mut scene = Scene::new(cfg, theme, seed);
+    scene.start_memory(Some(memory::path()));
     let mut size = term::size();
     scene.aspect = size.aspect();
     let mut frame = Frame::new(size.cols, size.rows).with_colors(colors);
@@ -370,6 +456,7 @@ fn run(cfg: Config, seed: u64, preview: bool) -> i32 {
         }
     }
 
+    scene.save_memory();
     term::leave();
     if hypr_on {
         hypr::cursor_invisible(false);

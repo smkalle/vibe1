@@ -31,7 +31,13 @@ const SACCADE_TIME: f32 = 0.16;
 const CRUISE: f32 = 0.3;
 /// Horizontal distance over a fruit at which the mushroom body is asked to decide.
 const DECISION_REACH: f32 = 0.12;
-/// Without an answer within this long, the instinct lands (as the original).
+/// Hunger below which smells do not call (the original's APPETITE): a sated fly's
+/// receptors are too weakly driven for the antennal lobe to answer.
+const APPETITE: f32 = 0.2;
+/// Hover this long over the fruit before asking, so the brain has settled into the
+/// smell (about 30 model steps; the rate model's time constant is ~5 steps).
+const DECISION_SETTLE: f32 = 1.0;
+/// Without an answer within this long after asking, the instinct lands (as the original).
 const DECISION_WAIT: f32 = 1.5;
 /// A swatter blow: how long the fly tumbles, and how long punishment dopamine shows.
 const STUN_S: f32 = 0.4;
@@ -133,6 +139,8 @@ pub struct Fly {
     pub punish: f32,
     /// Where the current threat is, so an escape jumps away from it.
     pub threat_at: Option<V3>,
+    /// The fruit with sugar on it: the only one the fly feeds on.
+    pub sugar: Option<Spot>,
 }
 
 impl Fly {
@@ -167,6 +175,7 @@ impl Fly {
             stun: 0.0,
             punish: 0.0,
             threat_at: None,
+            sugar: None,
         }
     }
 
@@ -320,7 +329,7 @@ impl Fly {
                 self.set_mode(Mode::Approach, 20.0);
             }
             Mode::Sitting => {
-                if cmd.feed && self.spot.is_some_and(|s| s.is_food()) && self.hunger > 0.15 {
+                if cmd.feed && self.spot.is_some() && self.spot == self.sugar && self.hunger > 0.15 {
                     self.feeding = true;
                 }
                 if cmd.groom && !self.feeding {
@@ -390,7 +399,8 @@ impl Fly {
         self.climb(self.alt_target, dt);
         self.pos = self.pos + self.heading() * (self.speed * dt);
         if self.mode_t > self.mode_len && self.saccade.is_none() {
-            let mut spot = match rng.below(if self.hunger > 0.5 { 5 } else { 3 }) {
+            let choices = if self.hunger <= APPETITE { 1 } else if self.hunger > 0.5 { 5 } else { 3 };
+            let mut spot = match rng.below(choices) {
                 0 => Spot::Table(v3(
                     TABLE_CENTER.x + rng.range(-0.5, 0.5),
                     TABLE_SIZE.y,
@@ -404,6 +414,7 @@ impl Fly {
             }
             self.spot = Some(spot);
             self.decided = None;
+            self.decision_t = 0.0;
             self.set_mode(Mode::Approach, 20.0);
         }
     }
@@ -449,12 +460,9 @@ impl Fly {
                 Some(true) => {}
                 None if self.cmd.is_none() => self.decided = Some(true), // instincts approach every smell
                 None => {
-                    if !self.wants_decision {
-                        self.wants_decision = true;
-                        self.decision_t = 0.0;
-                    }
                     self.decision_t += dt;
-                    if self.decision_t > DECISION_WAIT {
+                    self.wants_decision = self.decision_t >= DECISION_SETTLE;
+                    if self.decision_t > DECISION_SETTLE + DECISION_WAIT {
                         self.decide(true); // no answer: the instinct lands
                     }
                     hold = true;
@@ -482,7 +490,7 @@ impl Fly {
         self.roll = damp(self.roll, 0.0, 6.0, dt);
         if (self.pos - rest).len() < 0.004 || self.mode_t > self.mode_len {
             self.pos = rest;
-            self.feeding = spot.is_food() && self.hunger > 0.3 && rng.chance(0.75);
+            self.feeding = Some(spot) == self.sugar && self.hunger > 0.15 && rng.chance(0.9);
             if spot.is_food() {
                 self.avoided = None;
             }
@@ -770,7 +778,12 @@ mod tests {
         fly.spot = Some(Spot::Banana);
         fly.pos = Spot::Banana.pos() + v3(0.05, 0.12, 0.0);
         fly.mode = Mode::Approach;
-        fly.step(1.0 / 30.0, &mut rng);
+        for _ in 0..40 {
+            fly.step(1.0 / 30.0, &mut rng);
+            if fly.wants_decision {
+                break;
+            }
+        }
         assert!(fly.wants_decision, "hovering over the fruit should ask the mushroom body");
         fly.decide(false);
         fly.step(1.0 / 30.0, &mut rng);

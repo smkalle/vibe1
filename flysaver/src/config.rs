@@ -186,6 +186,9 @@ pub struct Config {
     pub pilot: Pilot,
     pub threats: bool,
     pub eyes: Eyes,
+    pub learning: bool,
+    pub remember: bool,
+    pub sugar_minutes: f32,
     pub glitch: bool,
     pub hud: bool,
 }
@@ -208,6 +211,9 @@ impl Default for Config {
             pilot: Pilot::Brain,
             threats: true,
             eyes: Eyes::Red,
+            learning: true,
+            remember: true,
+            sugar_minutes: 20.0,
             glitch: true,
             hud: true,
         }
@@ -255,6 +261,9 @@ impl Config {
                     _ => false,
                 },
                 ("threats", Value::Bool(b)) => { self.threats = *b; true }
+                ("learning", Value::Bool(b)) => { self.learning = *b; true }
+                ("remember", Value::Bool(b)) => { self.remember = *b; true }
+                ("sugar_minutes", Value::Num(n)) => { self.sugar_minutes = (*n as f32).clamp(5.0, 240.0); true }
                 ("eyes", Value::Str(s)) => match s.as_str() {
                     "red" => { self.eyes = Eyes::Red; true }
                     "theme" => { self.eyes = Eyes::Theme; true }

@@ -353,3 +353,7 @@ Specified and measured in [flysaver-live-brain.md](flysaver-live-brain.md). This
 ### The brain flies (Phase 2)
 
 Specified and measured in [flysaver-brain-pilot.md](flysaver-brain-pilot.md): the live brain's output neurons steer the fly, a swatter tests the giant fibre, and the fly is a red-eyed mutant.
+
+### It learns (Phase 3)
+
+Specified and verified in [flysaver-learning.md](flysaver-learning.md): the mushroom body's actor-critic learns where the sugar is, relearns when it moves, and keeps its memory between idle sessions.

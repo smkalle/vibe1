@@ -50,6 +50,8 @@ pub struct HudInfo<'a> {
     pub pilot: &'a str,
     /// The brain's latest decision, shown for a few seconds.
     pub note: Option<&'a str>,
+    /// Phase 3: what the fly has learned, for the memory line.
+    pub memory: Option<String>,
     pub fly: &'a Fly,
     pub camera: &'a str,
     pub neurons_drawn: usize,
@@ -101,6 +103,9 @@ pub fn draw(f: &mut Frame, theme: &Theme, info: &HudInfo) {
         second.push_str(&format!(" · {}", recent.join(" · ")));
     }
     f.text(2, row + 1, &fit(&second, w - 4), theme.hud);
+    if let Some(m) = &info.memory {
+        f.text(2, row + 2, &fit(m, w - 4), theme.hud);
+    }
     let credit = fit(CREDIT, w - 2);
     let col = (w as i32 - credit.chars().count() as i32) / 2;
     f.text(col.max(0), f.rows as i32 - 1, &credit, theme.hud);

@@ -124,6 +124,7 @@ first-class hook.
 | `learning` | `true` | lessons change the Kenyon-cell → MBON synapses; `false` keeps the measured seam fixed |
 | `remember` | `true` | load and save the fly's memory in `~/.local/state/flysaver/memory.bin` |
 | `sugar_minutes` | `20` | minutes of screensaver time before the sugar moves to the other fruit (5–240) |
+| `bitter` | `true` | the sugar is sometimes laced with caffeine, which the fly tastes and learns from; `false` keeps it always sweet |
 | `glitch` | `true` | the occasional stutter and jitter |
 | `hud` | `true` | title, status line, credits |
 
@@ -197,7 +198,8 @@ the original's rules and constants (`web/life.js`):
 | giant fibre > 0.5 | **escape**: jump off, away from the threat | a swatter coming at a sitting fly fires it when the swatter is about 10 cm away. The fly gets out every time in the tests, while on instincts it gets hit every time |
 | MBON11 vs MBON05 | over a fruit, approach or avoid (softmax, T 0.3) | the naive fly prefers the bread (p ≈ 0.70) to the banana (p ≈ 0.35) |
 | DNp07/DNp10 > 0.15 | land now | rises with strong looming |
-| DNp09, MN9, aDN | speed, feeding, grooming | stay silent under these senses, so the instincts carry those behaviours |
+| MN9 | feeding | silent in flight; bursts when the fly lands on sugar (see [It tastes](#it-tastes)) |
+| DNp09, aDN | speed, grooming | stay silent under these senses, so the instincts carry those behaviours |
 
 **The swatter.** A wireframe swatter comes for a sitting fly every 40–90 s.
 It looms the way the original's swatting hand does. If the giant fibre fires
@@ -266,6 +268,67 @@ approach p, bread   first 3 decisions 0.45  ->  last 3 0.80   (22 decisions)
 and Morgan's famous 1910 mutant was the *white*-eyed one. But in the Matrix
 green is normal, so this fly is the mutant. `eyes = "theme"` restores the
 old look.
+
+## It tastes
+
+Feeding is the brain's decision, through the classic gustatory assay: the
+**proboscis extension reflex**. When the fly lands on the sugared fruit, its
+labellum tastes the sugar and the proboscis motor neuron **MN9** fires,
+peaking about 1.3 s after touchdown. The proboscis extends as far as MN9
+drives it. If the peak passes the feeding level, the fly feeds.
+
+**Bitter.** Each time the sugar is placed or moves, it's laced with
+caffeine 40% of the time, at a random strength from 0.2 to 1. The HUD shows
+it (`sugar on the bread (caffeine 0.60)`). Bitter taste on the labellum and
+front legs suppresses MN9 through the measured wiring. These are the
+model's own numbers, the peak MN9 after landing:
+
+| Caffeine | none (no sugar) | 0 | 0.25 | 0.5 | 0.75 | 1 |
+|---|---|---|---|---|---|---|
+| bread, a brain's first taste | 0 | 0.476 | 0.475 | 0.442 | 0.229 | 0.013 |
+| bread, an experienced fly | 0 | 0.116 | 0.109 | 0.029 | 0.004 | 0.000 |
+| banana, an experienced fly | 0 | 0.199 | 0.194 | 0.091 | 0.021 | 0.002 |
+
+The first sugar a freshly loaded brain tastes bursts about ten times higher
+than any taste after it. That's why the original's feeding level of 0.2
+would let an experienced fly starve. Instead the feeding level is set
+against the silent baseline, at **0.005**. In 152 landings on plain sugar
+across six 30-minute runs, the weakest peak was 0.016.
+
+**Known limit.** The first sugar of each idle session is taken even when
+strongly laced, because that naive burst survives bitter 1.0 at 0.013.
+
+In four 45-minute runs with lacing on:
+
+| Caffeine | fed | refused |
+|---|---|---|
+| none | 94 | 0 |
+| 0.34–0.40 | 19 | 0 |
+| 0.86–0.89 | 1 (a first taste) | 30 |
+
+**A bitter lesson.** Bitter drives the PPL1 punishment dopamine neurons, and
+the lesson on the sugared fruit pays (fed ? 1 : 0) − caffeine:
+
+```
+lesson: bread, sugar, MN9 peak 0.044 → fed +1 (dopamine +0.93)
+lesson: bread, sugar + caffeine 0.34, MN9 peak 0.021 → fed +0.66 (dopamine +0.50)
+lesson: bread, sugar + caffeine 0.86, MN9 peak 0.001 → refused -0.86 (dopamine -0.86)
+```
+
+Ten lessons on a banana laced at 1.0 drop its approach probability from 0.35
+to 0.20. In a full run, a fly whose bread was laced at 0.86 went from
+approaching the bread at p 0.58 to 0.26, and turned to the unlaced banana.
+
+**Its colour.** The proboscis has its own colour: **amber-gold `#ffb020`**
+for sugar, going through peach and pale lilac to **violet `#a070ff`** as the
+caffeine rises. The mix is in OKLab, because an RGB mix passes through the
+eyes' dusty red. Amber sits 53° of OKLab hue from the red eyes (`#ff3048`)
+and 79° from the Matrix-green body, and the violet end sits 86° from the
+eyes. A test holds
+every shade along the way off the eyes' red.
+
+`flysaver snapshot --taste 0.6 --time 1.6 --camera follow` shows a fly
+feeding on sugar laced at 0.6.
 
 ## Performance
 

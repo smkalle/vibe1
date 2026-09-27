@@ -314,6 +314,23 @@ mod tests {
         assert!(n < 200 && b1 > 0.5, "never learned the banana's sugar");
     }
 
+    /// Sugar laced so strongly the fly refuses it: each approach to the banana is a bitter
+    /// lesson (0 sugar - 1.0 bitter), and the fly learns to avoid the banana.
+    #[test]
+    fn a_strongly_laced_fruit_is_avoided() {
+        let mut brain = Brain::load();
+        let mut l = Learner::new(&brain);
+        let mut seed = 5u32;
+        let b0 = last_p(&tmaze(&mut brain, &mut l, 2, &mut seed, |_, _| 0.0), "banana");
+        let (mut n, mut p) = (0, b0);
+        while n < 200 && p > b0 - 0.1 {
+            p = last_p(&tmaze(&mut brain, &mut l, 2, &mut seed, |f, c| if f == "banana" && c == 0 { -1.0 } else { 0.0 }), "banana");
+            n += 2;
+        }
+        eprintln!("laced banana: approach p {b0:.2} -> {p:.2} in {n} lessons");
+        assert!(n < 200, "never learned to avoid the laced banana");
+    }
+
     #[test]
     fn when_the_sugar_moves_the_fly_relearns() {
         // Extinction: the banana stops paying (the screensaver's usual case).

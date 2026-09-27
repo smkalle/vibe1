@@ -49,6 +49,7 @@ options (override ~/.config/omarchy/flysaver.toml):
   --layers rain,room,brain,fly,hud,logo  --seed N
   --size COLSxROWS  --time SECONDS  --frames N  --html   (snapshot/bench)
   --swat SECONDS    snapshot: perch the fly, send the swatter, draw SECONDS later
+  --taste BITTER    snapshot: land on the sugared bread laced with BITTER (0-1), draw --time later
 ";
 
 const ABOUT: &str = "\
@@ -73,8 +74,13 @@ brain layer, its output neurons, read against their level-flight rest,
 override the instincts. DNa02 left/right turn the fly, DNp09 sets its speed,
 DNp07/DNp10 land it, the giant fibre fires an escape from the swatter, MN9
 feeds and aDN grooms, and over a fruit the mushroom body's MBON11 and MBON05
-decide approach or avoid (a softmax, T 0.3). Under these senses the speed,
-feeding and grooming neurons stay silent, so the instincts carry those.
+decide approach or avoid (a softmax, T 0.3). Under these senses the speed
+and grooming neurons stay silent, so the instincts carry those.
+
+What it tastes (bitter = true, the default): landing on sugar makes MN9
+burst, the proboscis (amber) extends and the fly feeds. Sometimes the sugar
+is laced with caffeine: bitter suppresses the burst, the proboscis turns
+violet and stays in, and the PPL1 punishment dopamine teaches avoidance.
 
 What it learns (learning = true, the default): each decision over a fruit is
 a lesson. Sugar where it lands is +1, an empty fruit left or avoided 0, the
@@ -103,10 +109,11 @@ struct Opts {
     swat: Option<f32>,
     minutes: f32,
     save: bool,
+    taste: Option<f32>,
 }
 
 fn parse_args(cfg: &mut Config) -> Result<Opts, String> {
-    let mut o = Opts { cmd: "run".into(), seed: None, size: (120, 40), time: 12.0, frames: 300, html: false, swat: None, minutes: 10.0, save: false };
+    let mut o = Opts { cmd: "run".into(), seed: None, size: (120, 40), time: 12.0, frames: 300, html: false, swat: None, minutes: 10.0, save: false, taste: None };
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         let mut val = |name: &str| args.next().ok_or(format!("{name} needs a value"));
@@ -130,6 +137,7 @@ fn parse_args(cfg: &mut Config) -> Result<Opts, String> {
             "--html" => o.html = true,
             "--minutes" => o.minutes = val("--minutes")?.parse().map_err(|_| "bad minutes")?,
             "--save" => o.save = true,
+            "--taste" => o.taste = Some(val("--taste")?.parse().map_err(|_| "bad bitter level")?),
             "--swat" => o.swat = Some(val("--swat")?.parse().map_err(|_| "bad swat time")?),
             "--time" => o.time = val("--time")?.parse().map_err(|_| "bad time")?,
             "--frames" => o.frames = val("--frames")?.parse().map_err(|_| "bad frames")?,
@@ -165,9 +173,10 @@ fn main() {
         "run" => run(cfg, seed, false),
         "preview" => run(cfg, seed, true),
         "snapshot" => {
-            print!("{}", match opts.swat {
-                Some(after) => swat_snapshot(cfg, seed, opts.size, after, opts.html),
-                None => snapshot(cfg, seed, opts.size, opts.time, opts.html),
+            print!("{}", match (opts.swat, opts.taste) {
+                (Some(after), _) => swat_snapshot(cfg, seed, opts.size, after, opts.html),
+                (None, Some(bitter)) => taste_snapshot(cfg, seed, opts.size, bitter, opts.time, opts.html),
+                (None, None) => snapshot(cfg, seed, opts.size, opts.time, opts.html),
             });
             0
         }
@@ -338,6 +347,33 @@ fn train(cfg: Config, seed: u64, minutes: f32, save: bool) -> i32 {
         scene.save_memory();
     }
     0
+}
+
+/// A demo frame: the fly lands on the sugared bread laced with `bitter`, drawn `after`
+/// seconds later (README screenshots of the proboscis extension reflex).
+fn taste_snapshot(cfg: Config, seed: u64, (cols, rows): (usize, usize), bitter: f32, after: f32, html: bool) -> String {
+    let mut cfg = cfg;
+    cfg.glitch = false;
+    cfg.threats = false;
+    let colors = if html { cfg.colors.resolve_env() } else { Colors::TrueColor };
+    let theme = if html { Theme::load(cfg.palette) } else { Theme::matrix() };
+    let mut scene = Scene::new(cfg, theme, seed);
+    scene.show_timing = false;
+    scene.sugar = sim::Spot::Bread;
+    scene.bitter = bitter.clamp(0.0, 1.0);
+    scene.fly.pos = math::v3(1.2, 1.3, 1.2);
+    let dt = 1.0 / 30.0;
+    for _ in 0..40 {
+        scene.step(dt, cols, rows);
+    }
+    scene.fly.perch(sim::Spot::Bread);
+    scene.fly.hunger = 0.8;
+    for _ in 0..(after / dt) as usize {
+        scene.step(dt, cols, rows);
+    }
+    let mut f = Frame::new(cols, rows).with_colors(colors);
+    scene.draw(&mut f);
+    if html { f.to_html() } else { f.to_text() }
 }
 
 fn bench(cfg: Config, seed: u64, (cols, rows): (usize, usize), frames: usize) -> i32 {

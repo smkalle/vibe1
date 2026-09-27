@@ -204,6 +204,20 @@ pub mod xterm {
     }
 }
 
+/// The proboscis, fixed like the eyes: amber-gold (sugar), shifting to violet as the
+/// taste turns bitter. Chosen to stand apart from the red eyes and the theme-green body.
+pub const PROBOSCIS: Rgb = Rgb(0xff, 0xb0, 0x20);
+pub const PROBOSCIS_BITTER: Rgb = Rgb(0xa0, 0x70, 0xff);
+
+/// The proboscis at a bitter level: amber, through peach and pale lilac, to violet. The mix
+/// is in OKLab because an RGB mix of amber and violet passes through the eyes' dusty red.
+pub fn proboscis(bitter: f32) -> Rgb {
+    let t = bitter.clamp(0.0, 1.0);
+    let (a, b) = (oklab::from_rgb(PROBOSCIS), oklab::from_rgb(PROBOSCIS_BITTER));
+    let m = |x: f32, y: f32| x + (y - x) * t;
+    oklab::to_rgb(m(a.0, b.0), m(a.1, b.1), m(a.2, b.2)).unwrap_or(PROBOSCIS)
+}
+
 /// An accent with less chroma than this is grey (vantablack, white and
 /// solitude are 0-0.012; the warm neutrals kanagawa and last-horizon ~0.04).
 const GREY_ACCENT: f32 = 0.03;
@@ -436,6 +450,31 @@ mod tests {
         assert_eq!(t.heat(0.0), t.wire);
         assert_eq!(t.heat(0.5), t.fire);
         assert!(t.heat(1.0).luma() > t.fire.luma());
+    }
+
+    /// The proboscis must stand apart from the red eyes and the (Matrix-green) body.
+    #[test]
+    fn proboscis_colour_is_distinct_from_eyes_and_body() {
+        let hue = |c: Rgb| xterm::lch(c).2.to_degrees();
+        let apart = |a: Rgb, b: Rgb| {
+            let d = (hue(a) - hue(b)).abs() % 360.0;
+            d.min(360.0 - d)
+        };
+        let eyes = Rgb(0xff, 0x30, 0x48);
+        let m = Theme::matrix();
+        for (name, other) in [("eyes", eyes), ("body", m.fly), ("wireframe", m.wire), ("firing", m.fire)] {
+            let d = apart(PROBOSCIS, other);
+            eprintln!("proboscis vs {name}: {d:.0} deg");
+            assert!(d >= 40.0, "proboscis too close to the {name} ({d:.0} deg)");
+        }
+        // Every shade on the way to bitter stays off the eyes' red: far in hue, or pale.
+        for k in 0..=10 {
+            let c = proboscis(k as f32 / 10.0);
+            let (d, chroma) = (apart(c, eyes), xterm::lch(c).1);
+            eprintln!("proboscis at bitter {:.1}: {c:?}, {d:.0} deg from the eyes, chroma {chroma:.3}", k as f32 / 10.0);
+            assert!(d >= 30.0 || chroma < 0.08, "bitter {k}/10 looks like the eyes");
+        }
+        assert_eq!((proboscis(0.0), proboscis(1.0)), (PROBOSCIS, PROBOSCIS_BITTER));
     }
 
     #[test]

@@ -357,3 +357,7 @@ Specified and measured in [flysaver-brain-pilot.md](flysaver-brain-pilot.md): th
 ### It learns (Phase 3)
 
 Specified and verified in [flysaver-learning.md](flysaver-learning.md): the mushroom body's actor-critic learns where the sugar is, relearns when it moves, and keeps its memory between idle sessions.
+
+### It tastes (Phase 4)
+
+Specified and verified in [flysaver-taste.md](flysaver-taste.md): MN9's proboscis extension reflex decides feeding, bitter (caffeine) lacing suppresses it and punishes, and the proboscis has its own amber-to-violet colour.

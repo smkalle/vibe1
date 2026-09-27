@@ -94,7 +94,11 @@ const TURN_DEADBAND: f64 = 0.02;
 const K_SPEED: f64 = 0.6;
 const LAND_LEVEL: f64 = 0.15;
 const ESCAPE_LEVEL: f64 = 0.5;
-const FEED_LEVEL: f64 = 0.2;
+/// MN9 above this starts feeding. Without sugar MN9 is 0 (at most 1e-5); tasting sugar, it
+/// peaks 0.02-0.3 about 1.3 s after landing (0.3-0.48 only on a brain's very first
+/// taste), and bitter suppresses that peak. The original's 0.2 is reached only on that
+/// first taste, so the threshold is set against the zero baseline (specs/flysaver-taste.md).
+const FEED_LEVEL: f64 = 0.005;
 const GROOM_LEVEL: f64 = 0.15;
 /// The page's softmax temperature for the mushroom body's choice.
 const MB_TEMPERATURE: f64 = 0.3;
@@ -131,6 +135,7 @@ impl Live {
             escape: self.read[4] > ESCAPE_LEVEL,
             feed: self.read[5] > FEED_LEVEL,
             groom: self.dev(6) > GROOM_LEVEL,
+            mn9: self.read[5] as f32,
         }
     }
 

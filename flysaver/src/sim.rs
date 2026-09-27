@@ -1,6 +1,12 @@
-//! The fly's life and the camera director. Procedural, no neural simulation:
-//! rates follow the original page's ethogram (flight bouts of ~5-15 s, about
-//! 0.45 saccades per second of flight, sits of 3-8 s, grooming, feeding).
+//! The fly's life and the camera director.
+//!
+//! Two layers act on the fly, as in "A fly in the Matrix" (web/life.js). The
+//! instinct layer is procedural and declared: flight bouts of ~5-15 s, about 0.45
+//! saccades per second of flight, sits of 3-8 s, grooming, feeding, wall
+//! avoidance. When `cmd` is set, the brain layer overrides it with what the live
+//! model's output neurons say (see scene::brain::Live::command): turns, speed,
+//! landing, escape, feeding, grooming, and the mushroom body's approach-or-avoid
+//! decision over a fruit.
 
 use crate::config::CameraMode;
 use crate::math::{angle_diff, damp, damp3, smoothstep, v3, V3};
@@ -23,6 +29,26 @@ const FLIGHT_MAX: V3 = v3(2.65, 1.95, 2.65);
 const SACCADE_RATE: f32 = 0.45;
 const SACCADE_TIME: f32 = 0.16;
 const CRUISE: f32 = 0.3;
+/// Horizontal distance over a fruit at which the mushroom body is asked to decide.
+const DECISION_REACH: f32 = 0.12;
+/// Without an answer within this long, the instinct lands (as the original).
+const DECISION_WAIT: f32 = 1.5;
+/// A swatter blow: how long the fly tumbles, and how long punishment dopamine shows.
+const STUN_S: f32 = 0.4;
+const PUNISH_S: f32 = 0.8;
+
+/// What the brain's output neurons ask for this frame.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Command {
+    /// DNa02 asymmetry turn in the original's convention (left turn positive), rad/s.
+    pub turn_rate: f32,
+    /// DNp09: fraction of cruise speed.
+    pub speed_factor: f32,
+    pub land: bool,
+    pub escape: bool,
+    pub feed: bool,
+    pub groom: bool,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Mode {
@@ -36,6 +62,7 @@ pub enum Mode {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Spot {
     Table(V3),
+    Floor(V3),
     Banana,
     Bread,
 }
@@ -43,17 +70,18 @@ pub enum Spot {
 impl Spot {
     pub fn pos(self) -> V3 {
         match self {
-            Spot::Table(p) => p,
+            Spot::Table(p) | Spot::Floor(p) => p,
             Spot::Banana => BANANA + v3(0.0, 0.035, 0.0),
             Spot::Bread => BREAD + v3(0.0, 0.07, 0.0),
         }
     }
     pub fn is_food(self) -> bool {
-        !matches!(self, Spot::Table(_))
+        matches!(self, Spot::Banana | Spot::Bread)
     }
     pub fn name(self) -> &'static str {
         match self {
             Spot::Table(_) => "table",
+            Spot::Floor(_) => "floor",
             Spot::Banana => "banana",
             Spot::Bread => "bread",
         }
@@ -66,6 +94,8 @@ pub enum Event {
     Saccade,
     TakeOff,
     Land,
+    Escape,
+    Hit,
 }
 
 #[derive(Clone)]
@@ -91,6 +121,18 @@ pub struct Fly {
     pub hunger: f32,
     pub events: Vec<Event>,
     pub time: f32,
+    /// The brain layer's command; None flies on instinct alone.
+    pub cmd: Option<Command>,
+    /// Set while hovering over a fruit, waiting for the mushroom body.
+    pub wants_decision: bool,
+    decided: Option<bool>,
+    decision_t: f32,
+    /// The fruit the fly last chose to leave, skipped by the next approach.
+    avoided: Option<Spot>,
+    pub stun: f32,
+    pub punish: f32,
+    /// Where the current threat is, so an escape jumps away from it.
+    pub threat_at: Option<V3>,
 }
 
 impl Fly {
@@ -117,6 +159,82 @@ impl Fly {
             hunger: rng.range(0.4, 0.8),
             events: Vec::new(),
             time: 0.0,
+            cmd: None,
+            wants_decision: false,
+            decided: None,
+            decision_t: 0.0,
+            avoided: None,
+            stun: 0.0,
+            punish: 0.0,
+            threat_at: None,
+        }
+    }
+
+    /// Put the fly down on `spot` for a long sit (tests and demos).
+    pub fn perch(&mut self, spot: Spot) {
+        self.spot = Some(spot);
+        self.pos = spot.pos() + v3(0.0, FLY_LEN * 0.28, 0.0);
+        self.feeding = false;
+        self.set_mode(Mode::Sitting, 1e6);
+        self.groom_t = 1e6;
+    }
+
+    /// The mushroom body's answer for the fruit being approached.
+    pub fn decide(&mut self, approach: bool) {
+        self.decided = Some(approach);
+        self.wants_decision = false;
+    }
+
+    /// The giant fibre fired: jump off whatever it is doing, away from `from`.
+    pub fn escape(&mut self, from: V3) {
+        let away = self.pos - from;
+        let yaw = away.z.atan2(away.x);
+        self.events.push(Event::Escape);
+        self.feeding = false;
+        self.grooming = 0.0;
+        self.wants_decision = false;
+        self.decided = None;
+        self.spot = None;
+        self.burst = 1.5;
+        if self.airborne() && self.mode != Mode::TakeOff {
+            self.alt_target = (self.pos.y + 0.4).min(FLIGHT_MAX.y);
+            self.set_mode(Mode::Flying, 5.0);
+            self.start_saccade(yaw);
+        } else {
+            self.events.push(Event::TakeOff);
+            self.yaw = yaw;
+            self.speed = 0.5;
+            self.vy = 0.9;
+            self.set_mode(Mode::TakeOff, 0.6);
+        }
+    }
+
+    /// Struck by the swatter: a tumble, and punishment dopamine for a moment.
+    pub fn hit(&mut self) {
+        self.events.push(Event::Hit);
+        self.stun = STUN_S;
+        self.punish = PUNISH_S;
+        self.feeding = false;
+        self.grooming = 0.0;
+        if !self.airborne() {
+            self.events.push(Event::TakeOff);
+            self.set_mode(Mode::TakeOff, 0.8);
+            self.vy = 0.4;
+        }
+    }
+
+    /// Where to set down when the brain asks to land now: the table if over it, else the floor.
+    fn landing_spot(&self) -> Spot {
+        let (hx, hz) = (TABLE_SIZE.x * 0.5, TABLE_SIZE.z * 0.5);
+        let over = (self.pos.x - TABLE_CENTER.x).abs() < hx + 0.1 && (self.pos.z - TABLE_CENTER.z).abs() < hz + 0.1 && self.pos.y > TABLE_SIZE.y;
+        if over {
+            Spot::Table(v3(
+                self.pos.x.clamp(TABLE_CENTER.x - hx + 0.05, TABLE_CENTER.x + hx - 0.05),
+                TABLE_SIZE.y,
+                self.pos.z.clamp(TABLE_CENTER.z - hz + 0.05, TABLE_CENTER.z + hz - 0.05),
+            ))
+        } else {
+            Spot::Floor(v3(self.pos.x.clamp(0.2, ROOM.x - 0.2), 0.0, self.pos.z.clamp(0.2, ROOM.z - 0.2)))
         }
     }
 
@@ -136,6 +254,7 @@ impl Fly {
     pub fn status(&self) -> &'static str {
         match self.mode {
             Mode::Flying => "flying",
+            Mode::Approach if self.wants_decision => "deciding",
             Mode::Approach => "smelling",
             Mode::Landing => "landing",
             Mode::TakeOff => "take-off",
@@ -155,6 +274,22 @@ impl Fly {
         self.events.clear();
         self.time += dt;
         self.mode_t += dt;
+        self.punish = (self.punish - dt).max(0.0);
+        if self.stun > 0.0 {
+            // Tumbling from a blow: spin, drop a little, nothing else.
+            self.stun -= dt;
+            self.roll += 14.0 * dt;
+            self.yaw += 6.0 * dt;
+            self.pos.y -= 0.15 * dt;
+            if self.stun <= 0.0 {
+                self.roll = 0.0;
+            }
+            self.clamp_to_room();
+            return;
+        }
+        if let Some(cmd) = self.cmd {
+            self.obey(cmd);
+        }
         if self.airborne() {
             self.wing_phase = (self.wing_phase + dt * 11.0) % 1.0; // visual flicker, not 200 Hz
         }
@@ -166,14 +301,42 @@ impl Fly {
             Mode::Sitting => self.sit(dt, rng),
             Mode::TakeOff => self.take_off(dt, rng),
         }
-        // Clamp to the room whatever happens.
+        self.clamp_to_room();
+        let now = self.time;
+        self.saccade_log.retain(|t| now - *t < 20.0);
+    }
+
+    /// Discrete brain commands: escape, land now, feed, groom.
+    fn obey(&mut self, cmd: Command) {
+        if cmd.escape && self.mode != Mode::TakeOff {
+            let from = self.threat_at.unwrap_or(self.pos + self.heading() * 0.3);
+            self.escape(from);
+            return;
+        }
+        match self.mode {
+            Mode::Flying if cmd.land && self.saccade.is_none() && self.mode_t > 1.0 => {
+                self.spot = Some(self.landing_spot());
+                self.decided = None;
+                self.set_mode(Mode::Approach, 20.0);
+            }
+            Mode::Sitting => {
+                if cmd.feed && self.spot.is_some_and(|s| s.is_food()) && self.hunger > 0.15 {
+                    self.feeding = true;
+                }
+                if cmd.groom && !self.feeding {
+                    self.grooming = 1.0;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn clamp_to_room(&mut self) {
         self.pos = v3(
             self.pos.x.clamp(0.05, ROOM.x - 0.05),
             self.pos.y.clamp(0.02, ROOM.y - 0.05),
             self.pos.z.clamp(0.05, ROOM.z - 0.05),
         );
-        let now = self.time;
-        self.saccade_log.retain(|t| now - *t < 20.0);
     }
 
     fn start_saccade(&mut self, to: f32) {
@@ -198,6 +361,10 @@ impl Fly {
         let turning = self.turn(dt);
         if !turning {
             self.roll = damp(self.roll, 0.0, 6.0, dt);
+            // Brain: DNa02 asymmetry turns (the original's left-positive, our yaw grows rightward).
+            if let Some(cmd) = self.cmd {
+                self.yaw -= cmd.turn_rate * dt;
+            }
             // Walls ahead: turn away, toward the middle of the room.
             let ahead = self.pos + self.heading() * 0.45;
             let outside = ahead.x < FLIGHT_MIN.x || ahead.x > FLIGHT_MAX.x || ahead.z < FLIGHT_MIN.z || ahead.z > FLIGHT_MAX.z;
@@ -217,12 +384,13 @@ impl Fly {
             self.burst = rng.range(1.5, 3.0);
         }
         self.burst = (self.burst - dt).max(0.0);
-        let want = if self.burst > 0.0 { 0.6 } else { CRUISE };
+        let factor = self.cmd.map_or(1.0, |c| c.speed_factor);
+        let want = if self.burst > 0.0 { 0.6 } else { CRUISE * factor };
         self.speed = damp(self.speed, want, 2.0, dt);
         self.climb(self.alt_target, dt);
         self.pos = self.pos + self.heading() * (self.speed * dt);
         if self.mode_t > self.mode_len && self.saccade.is_none() {
-            self.spot = Some(match rng.below(if self.hunger > 0.5 { 5 } else { 3 }) {
+            let mut spot = match rng.below(if self.hunger > 0.5 { 5 } else { 3 }) {
                 0 => Spot::Table(v3(
                     TABLE_CENTER.x + rng.range(-0.5, 0.5),
                     TABLE_SIZE.y,
@@ -230,7 +398,12 @@ impl Fly {
                 )),
                 1 | 3 => Spot::Banana,
                 _ => Spot::Bread,
-            });
+            };
+            if Some(spot) == self.avoided {
+                spot = if spot == Spot::Banana { Spot::Bread } else { Spot::Banana };
+            }
+            self.spot = Some(spot);
+            self.decided = None;
             self.set_mode(Mode::Approach, 20.0);
         }
     }
@@ -260,10 +433,39 @@ impl Fly {
                 self.roll = damp(self.roll, -d.clamp(-0.5, 0.5), 6.0, dt);
             }
         }
-        self.speed = damp(self.speed, (dist * 0.8).clamp(0.05, CRUISE), 3.0, dt);
+        // Over a fruit, the mushroom body decides once: land on it, or leave it.
+        let mut hold = false;
+        if spot.is_food() && dist < DECISION_REACH {
+            match self.decided {
+                Some(false) => {
+                    self.avoided = Some(spot);
+                    self.spot = None;
+                    self.decided = None;
+                    self.alt_target = (self.pos.y + 0.3).min(FLIGHT_MAX.y);
+                    self.set_mode(Mode::Flying, rng.range(4.0, 10.0));
+                    self.start_saccade(self.yaw + PI + rng.range(-0.5, 0.5));
+                    return;
+                }
+                Some(true) => {}
+                None if self.cmd.is_none() => self.decided = Some(true), // instincts approach every smell
+                None => {
+                    if !self.wants_decision {
+                        self.wants_decision = true;
+                        self.decision_t = 0.0;
+                    }
+                    self.decision_t += dt;
+                    if self.decision_t > DECISION_WAIT {
+                        self.decide(true); // no answer: the instinct lands
+                    }
+                    hold = true;
+                }
+            }
+        }
+        let cap = if hold { 0.03 } else { CRUISE };
+        self.speed = damp(self.speed, (dist * 0.8).clamp(0.02, cap), 3.0, dt);
         self.climb(target.y, dt);
         self.pos = self.pos + self.heading() * (self.speed * dt).min(dist);
-        if dist < 0.03 && (to.y).abs() < 0.03 {
+        if !hold && dist < 0.03 && (to.y).abs() < 0.03 {
             self.set_mode(Mode::Landing, 2.0);
         } else if self.mode_t > self.mode_len {
             self.spot = None;
@@ -281,6 +483,9 @@ impl Fly {
         if (self.pos - rest).len() < 0.004 || self.mode_t > self.mode_len {
             self.pos = rest;
             self.feeding = spot.is_food() && self.hunger > 0.3 && rng.chance(0.75);
+            if spot.is_food() {
+                self.avoided = None;
+            }
             self.events.push(Event::Land);
             self.set_mode(Mode::Sitting, rng.range(3.0, 8.0) + if self.feeding { 3.0 } else { 0.0 });
             self.groom_t = rng.range(0.5, 2.0);
@@ -317,6 +522,40 @@ impl Fly {
             self.alt_target = rng.range(0.9, 1.8);
             self.set_mode(Mode::Flying, rng.range(5.0, 15.0));
         }
+    }
+}
+
+/// Half-size of the swatter's head: the looming disc (the original's hand is 2.5 cm).
+pub const SWATTER_R: f32 = 0.04;
+const SWATTER_SPEED: f32 = 0.6;
+const SWATTER_START: f32 = 0.8;
+
+/// A swatter coming at a sitting fly: the threat the giant fibre exists for.
+#[derive(Clone, Debug)]
+pub struct Threat {
+    pub pos: V3,
+    pub vel: V3,
+    travelled: f32,
+    pub hit: bool,
+}
+
+impl Threat {
+    /// Aimed at `target` from above and to one side.
+    pub fn aimed_at(target: V3, rng: &mut Rng) -> Threat {
+        let a = rng.range(0.0, TAU);
+        let dir = (v3(a.cos(), -0.9, a.sin())).norm();
+        Threat { pos: target - dir * SWATTER_START, vel: dir * SWATTER_SPEED, travelled: 0.0, hit: false }
+    }
+
+    /// Move; strike the fly if it is still there. Returns false once the swing is over.
+    pub fn step(&mut self, dt: f32, fly: &mut Fly) -> bool {
+        self.pos = self.pos + self.vel * dt;
+        self.travelled += SWATTER_SPEED * dt;
+        if !self.hit && (self.pos - fly.pos).len() < SWATTER_R + 0.02 {
+            self.hit = true;
+            fly.hit();
+        }
+        self.travelled < SWATTER_START + 0.25 && self.pos.y > 0.0
     }
 }
 
@@ -469,6 +708,85 @@ mod tests {
         }
         let rate = saccades as f32 / flying;
         assert!((0.3..1.2).contains(&rate), "saccade rate {rate}");
+    }
+
+    fn cmd() -> Command {
+        Command { speed_factor: 1.0, ..Command::default() }
+    }
+
+    #[test]
+    fn brain_escape_jumps_off_away_from_the_threat() {
+        let mut rng = Rng::new(2);
+        let mut fly = Fly::new(&mut rng);
+        fly.perch(Spot::Bread);
+        let threat = fly.pos + v3(0.2, 0.2, 0.0);
+        fly.threat_at = Some(threat);
+        fly.cmd = Some(Command { escape: true, ..cmd() });
+        fly.step(1.0 / 30.0, &mut rng);
+        assert!(fly.events.contains(&Event::Escape));
+        assert_eq!(fly.mode, Mode::TakeOff);
+        assert!(fly.heading().dot(threat - fly.pos) < 0.0, "jumped toward the threat");
+    }
+
+    #[test]
+    fn brain_landing_request_sets_down_on_the_nearest_surface() {
+        let mut rng = Rng::new(4);
+        let mut fly = Fly::new(&mut rng);
+        fly.pos = v3(0.5, 1.2, 0.5); // not over the table
+        fly.mode_t = 2.0;
+        fly.cmd = Some(Command { land: true, ..cmd() });
+        fly.step(1.0 / 30.0, &mut rng);
+        assert_eq!(fly.mode, Mode::Approach);
+        assert!(matches!(fly.spot, Some(Spot::Floor(_))));
+        let mut fly = Fly::new(&mut rng);
+        fly.pos = TABLE_CENTER + v3(0.1, 1.0, 0.1);
+        fly.mode_t = 2.0;
+        fly.cmd = Some(Command { land: true, ..cmd() });
+        fly.step(1.0 / 30.0, &mut rng);
+        assert!(matches!(fly.spot, Some(Spot::Table(_))));
+    }
+
+    #[test]
+    fn dna02_asymmetry_turns_the_fly() {
+        let mut rng = Rng::new(5);
+        let mut fly = Fly::new(&mut rng);
+        fly.pos = v3(1.5, 1.2, 1.5);
+        let y0 = fly.yaw;
+        fly.cmd = Some(Command { turn_rate: 1.0, ..cmd() }); // left turn, original's sign
+        let mut quiet = Rng::new(99);
+        for _ in 0..3 {
+            // a turn only, no spontaneous saccade: step with a fixed draw
+            fly.step(1.0 / 30.0, &mut quiet);
+        }
+        assert!(fly.saccade.is_none(), "seed drew a saccade; pick another");
+        assert!(angle_diff(y0, fly.yaw) < -0.05, "a left-positive command must lower our yaw");
+    }
+
+    #[test]
+    fn mushroom_body_avoid_leaves_the_fruit_and_the_next_approach_skips_it() {
+        let mut rng = Rng::new(6);
+        let mut fly = Fly::new(&mut rng);
+        fly.cmd = Some(cmd());
+        fly.spot = Some(Spot::Banana);
+        fly.pos = Spot::Banana.pos() + v3(0.05, 0.12, 0.0);
+        fly.mode = Mode::Approach;
+        fly.step(1.0 / 30.0, &mut rng);
+        assert!(fly.wants_decision, "hovering over the fruit should ask the mushroom body");
+        fly.decide(false);
+        fly.step(1.0 / 30.0, &mut rng);
+        assert_eq!(fly.mode, Mode::Flying);
+        assert_eq!(fly.avoided, Some(Spot::Banana));
+    }
+
+    #[test]
+    fn instincts_approach_every_smell_without_asking() {
+        let mut rng = Rng::new(6);
+        let mut fly = Fly::new(&mut rng);
+        fly.spot = Some(Spot::Banana);
+        fly.pos = Spot::Banana.pos() + v3(0.05, 0.12, 0.0);
+        fly.mode = Mode::Approach;
+        fly.step(1.0 / 30.0, &mut rng);
+        assert!(!fly.wants_decision);
     }
 
     #[test]

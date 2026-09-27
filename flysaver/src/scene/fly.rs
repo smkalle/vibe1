@@ -25,7 +25,7 @@ impl Pose {
 pub fn draw(f: &mut Frame, cam: &Cam, theme: &Theme, fly: &Fly) {
     let pose = Pose { at: fly.pos, b: Basis::from_euler(fly.yaw, fly.pitch, fly.roll), s: FLY_LEN };
     let body = theme.fly;
-    let eye = theme.fire;
+    let eye = theme.eyes;
 
     // Far away the wireframe collapses to a smear; give it a glowing core instead.
     let px = cam.project(fly.pos).map(|(_, _, z)| cam.scale_at(z) * FLY_LEN).unwrap_or(0.0);
@@ -66,7 +66,7 @@ pub fn draw(f: &mut Frame, cam: &Cam, theme: &Theme, fly: &Fly) {
 
     if fly.feeding {
         let ext = 0.6 + 0.4 * (fly.time * 5.0).sin().abs();
-        line3(f, cam, pose.w(v3(0.42, -0.04, 0.0)), pose.w(v3(0.46, -0.04 - 0.2 * ext, 0.0)), 1.0, eye);
+        line3(f, cam, pose.w(v3(0.42, -0.04, 0.0)), pose.w(v3(0.46, -0.04 - 0.2 * ext, 0.0)), 1.0, theme.fire);
     }
 
     legs(f, cam, &pose, fly, body);
@@ -168,4 +168,24 @@ fn wings(f: &mut Frame, cam: &Cam, pose: &Pose, fly: &Fly, col: Rgb) {
             poly3(f, cam, &wing_outline(pose, hinge, dir, across * 0.9), false, 0.5, col);
         }
     }
+}
+
+/// The swatter: a square mesh head on a handle, swinging along its velocity.
+pub fn draw_threat(f: &mut Frame, cam: &Cam, t: &crate::sim::Threat) {
+    let col = crate::scene::RED_EYES.mix(Rgb(255, 255, 255), 0.25);
+    let fwd = t.vel.norm();
+    let side = fwd.cross(V3::UP).norm();
+    let up = side.cross(fwd).norm();
+    let r = crate::sim::SWATTER_R * 1.6;
+    let c = t.pos;
+    let corner = |a: f32, b: f32| c + side * (a * r) + up * (b * r);
+    let rim = [corner(-1.0, -1.0), corner(1.0, -1.0), corner(1.0, 1.0), corner(-1.0, 1.0)];
+    poly3(f, cam, &rim, true, 1.0, col);
+    for k in 1..4 {
+        let u = -1.0 + k as f32 * 0.5;
+        line3(f, cam, corner(u, -1.0), corner(u, 1.0), 0.6, col);
+        line3(f, cam, corner(-1.0, u), corner(1.0, u), 0.6, col);
+    }
+    // The handle trails behind the head.
+    line3(f, cam, corner(0.0, -1.0), c - fwd * 0.35 - up * r * 1.5, 0.8, col);
 }

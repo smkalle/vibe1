@@ -12,8 +12,13 @@ drawn in truecolor text and braille. The scene has four parts:
   synapse classes wired as measured, runs the Cadence rate model every frame.
   The fly's senses feed its sensory neurons, and every active neuron lights up
   where it sits. Numerically, it matches the Cadence library to 3e-16.
+- **the brain flies the fly.** Its real output neurons steer: DNa02 turns
+  it, the giant fibre fires it out of the way of a swatter, and over a fruit
+  the mushroom body decides whether to land or leave
+- a red-eyed mutant: in the Matrix, green is normal
 
 ![The nervous system view](screenshots/brain.png)
+![The giant fibre fires: escape from the swatter](screenshots/swat.png)
 ![Following the fly](screenshots/follow.png)
 ![The room](screenshots/room.png)
 
@@ -108,6 +113,9 @@ first-class hook.
 | `brain` | `"live"` | the real rate model, or `"decorative"` for the lighter region pulses (about 2% of a core instead of about 6.5%) |
 | `brain_steps` | `1` | model steps per frame, 1–4 |
 | `vivid` | `true` | stronger, brighter colour: OKLab chroma ×1.8 with a lightness floor, and higher brightness floors. `false` restores the flatter look |
+| `pilot` | `"brain"` | the live brain's output neurons steer, or `"instincts"` for the procedural layer alone (the original's control condition). `brain` needs `brain = "live"` |
+| `threats` | `true` | a swatter comes for a sitting fly every 40–90 s |
+| `eyes` | `"red"` | the red-eyed mutant, or `"theme"` for the theme's firing colour |
 | `glitch` | `true` | the occasional stutter and jitter |
 | `hud` | `true` | title, status line, credits |
 
@@ -167,8 +175,33 @@ surface grow during the final approach.
 
 Both are tested (`src/senses.rs`, `through_the_wiring`).
 
-**What's still supplied:** the fly's behaviour is procedural. The brain
-watches, but it doesn't fly yet. That's the roadmap's Phase 2.
+## The brain flies the fly
+
+The instinct layer is the procedural behaviour: flight bouts, saccades,
+wall avoidance and sits. In the original it's the control condition and the
+fallback. The **brain layer** reads the live model's output neurons as
+deviations from their level-flight rest and overrides the instincts, with
+the original's rules and constants (`web/life.js`):
+
+| Neurons | What they do | Under our senses |
+|---|---|---|
+| DNa02 left − right | turn the fly (6 rad/s per unit) | a turn drives them against itself: an optomotor stabilising reflex, from the wiring |
+| giant fibre > 0.5 | **escape**: jump off, away from the threat | a swatter coming at a sitting fly fires it when the swatter is about 10 cm away. The fly gets out every time in the tests, while on instincts it gets hit every time |
+| MBON11 vs MBON05 | over a fruit, approach or avoid (softmax, T 0.3) | the naive fly prefers the bread (p ≈ 0.70) to the banana (p ≈ 0.35) |
+| DNp07/DNp10 > 0.15 | land now | rises with strong looming |
+| DNp09, MN9, aDN | speed, feeding, grooming | stay silent under these senses, so the instincts carry those behaviours |
+
+**The swatter.** A wireframe swatter comes for a sitting fly every 40–90 s.
+It looms the way the original's swatting hand does. If the giant fibre fires
+first, the fly escapes. If not, it's struck: it tumbles, and the punishment
+dopamine (PPL1) lights up. The HUD shows the brain's latest decision in the
+eye colour, for example `› giant fibre 0.537 → escape` or
+`› mushroom body: bread, approach (p 0.70)`.
+
+**The eyes.** They're red. In real *Drosophila*, red eyes are the wild type,
+and Morgan's famous 1910 mutant was the *white*-eyed one. But in the Matrix
+green is normal, so this fly is the mutant. `eyes = "theme"` restores the
+old look.
 
 ## Performance
 
@@ -195,9 +228,10 @@ per frame. 256-colour mode writes about a third less, for a little more CPU.
 
 | File | Role |
 |---|---|
-| `src/sim.rs` | The fly's life as a state machine: fly, approach a smell, land, sit, groom, feed, take off. Rates follow the original's ethogram (about 0.45 saccades per second of flight, 5–15 s bouts). Also the camera director. |
+| `src/sim.rs` (instinct layer) | The fly's procedural life: fly, approach a smell, land, sit, groom, feed, take off. Rates follow the original's ethogram (about 0.45 saccades per second of flight, 5–15 s bouts). Also the camera director. |
 | `src/neuro.rs` | The Cadence rate model on the 60,000-neuron sub-net, ported from the original's `web/brain.js`. |
-| `src/senses.rs` | The fly's state mapped onto its afferents, ported from the original's `web/senses.js` and `web/life.js`. |
+| `src/senses.rs` | The fly's state mapped onto its afferents, ported from the original's `web/senses.js` and `web/life.js`, including the swatter's looming. |
+| `src/sim.rs` | The instinct layer, the brain layer's `Command` (turn, speed, land, escape, feed, groom), the mushroom body's decision, and the swatter. |
 | `src/scene/` | One module per layer. `brain.rs` draws the whole-brain silhouette and, in live mode, every active neuron on a heat ramp. In decorative mode it pulses regions instead. |
 | `src/raster.rs`, `src/fb.rs` | Perspective projection and lines drawn into braille dots (2×4 per cell). The layers are composed into cells and written to the terminal as a diff. |
 | `src/term.rs`, `src/hypr.rs` | Raw mode, mouse-motion reporting, signals, Hyprland pointer and focus handling, and the close-every-monitor exit. |

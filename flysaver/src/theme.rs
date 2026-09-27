@@ -220,6 +220,8 @@ pub struct Theme {
     pub fly: Rgb,
     pub hud: Rgb,
     pub title: Rgb,
+    /// The fly's compound eyes.
+    pub eyes: Rgb,
 }
 
 impl Theme {
@@ -234,6 +236,7 @@ impl Theme {
             fly: Rgb(0xc8, 0xff, 0xd8),
             hud: Rgb(0x3d, 0x8a, 0x52),
             title: Rgb(0x39, 0xff, 0x6a),
+            eyes: Rgb(0xb8, 0xff, 0x5a),
         }
     }
 
@@ -269,6 +272,7 @@ impl Theme {
             fly: fg.at_least(0.7),
             hud: hud.at_least(0.3),
             title: accent.at_least(0.45),
+            eyes: fire.at_least(0.5),
         }
     }
 

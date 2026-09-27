@@ -44,6 +44,7 @@ options (override ~/.config/omarchy/flysaver.toml):
   --fps N  --camera cycle|follow|room|brain  --palette theme|theme-strict|matrix  --colors auto|truecolor|256
   --layers rain,room,brain,fly,hud,logo  --seed N
   --size COLSxROWS  --time SECONDS  --frames N  --html   (snapshot/bench)
+  --swat SECONDS    snapshot: perch the fly, send the swatter, draw SECONDS later
 ";
 
 const ABOUT: &str = "\
@@ -63,11 +64,21 @@ measured, running the Cadence graded rate model with the library's numbers
 (held to cadence.Brain's own outputs to 1e-9 by the parity test). The drawn
 activity is that model's.
 
-What is supplied: the fly's behaviour (flight bouts, saccades, landing,
-grooming, feeding) is procedural, and its senses are fed to the brain as the
-original page feeds them (halteres, ocelli, optic flow, antennae, odours,
-sugar, touch). The landing surface stands in for the original's swatting
-hand as the looming stimulus. The brain watches; it does not yet fly.
+What the brain decides (pilot = \"brain\", the default): as in the original's
+brain layer, its output neurons, read against their level-flight rest,
+override the instincts. DNa02 left/right turn the fly, DNp09 sets its speed,
+DNp07/DNp10 land it, the giant fibre fires an escape from the swatter, MN9
+feeds and aDN grooms, and over a fruit the mushroom body's MBON11 and MBON05
+decide approach or avoid (a softmax, T 0.3). Under these senses the speed,
+feeding and grooming neurons stay silent, so the instincts carry those.
+
+What is supplied: the instinct layer (flight bouts, saccades, wall
+avoidance, sits), the senses as the original page feeds them (halteres,
+ocelli, optic flow, antennae, odours, sugar, touch, dopamine), the swatter
+as the looming threat, and the body's kinematics.
+
+The eyes are red: a mutant in the Matrix, where green is normal. (In real
+Drosophila, red is the wild type; Morgan's 1910 mutant was white-eyed.)
 ";
 
 struct Opts {
@@ -77,10 +88,11 @@ struct Opts {
     time: f32,
     frames: usize,
     html: bool,
+    swat: Option<f32>,
 }
 
 fn parse_args(cfg: &mut Config) -> Result<Opts, String> {
-    let mut o = Opts { cmd: "run".into(), seed: None, size: (120, 40), time: 12.0, frames: 300, html: false };
+    let mut o = Opts { cmd: "run".into(), seed: None, size: (120, 40), time: 12.0, frames: 300, html: false, swat: None };
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         let mut val = |name: &str| args.next().ok_or(format!("{name} needs a value"));
@@ -102,6 +114,7 @@ fn parse_args(cfg: &mut Config) -> Result<Opts, String> {
                 o.size = (c.parse().map_err(|_| "bad cols")?, r.parse().map_err(|_| "bad rows")?);
             }
             "--html" => o.html = true,
+            "--swat" => o.swat = Some(val("--swat")?.parse().map_err(|_| "bad swat time")?),
             "--time" => o.time = val("--time")?.parse().map_err(|_| "bad time")?,
             "--frames" => o.frames = val("--frames")?.parse().map_err(|_| "bad frames")?,
             c if !c.starts_with('-') => o.cmd = c.to_string(),
@@ -136,7 +149,10 @@ fn main() {
         "run" => run(cfg, seed, false),
         "preview" => run(cfg, seed, true),
         "snapshot" => {
-            print!("{}", snapshot(cfg, seed, opts.size, opts.time, opts.html));
+            print!("{}", match opts.swat {
+                Some(after) => swat_snapshot(cfg, seed, opts.size, after, opts.html),
+                None => snapshot(cfg, seed, opts.size, opts.time, opts.html),
+            });
             0
         }
         "bench" => bench(cfg, seed, opts.size, opts.frames),
@@ -211,6 +227,30 @@ pub fn snapshot(cfg: Config, seed: u64, (cols, rows): (usize, usize), secs: f32,
     for _ in 0..(secs / dt) as usize {
         scene.step(dt, cols, rows);
     }
+    scene.draw(&mut f);
+    if html { f.to_html() } else { f.to_text() }
+}
+
+/// A demo frame: the fly perched on the bread, a swatter sent at it, the frame
+/// `after` seconds later (README screenshots of the giant-fibre escape).
+fn swat_snapshot(cfg: Config, seed: u64, (cols, rows): (usize, usize), after: f32, html: bool) -> String {
+    let mut cfg = cfg;
+    cfg.glitch = false;
+    cfg.threats = false;
+    let colors = if html { cfg.colors.resolve_env() } else { Colors::TrueColor };
+    let theme = if html { Theme::load(cfg.palette) } else { Theme::matrix() };
+    let mut scene = Scene::new(cfg, theme, seed);
+    scene.show_timing = false;
+    scene.fly.perch(sim::Spot::Bread);
+    let dt = 1.0 / 30.0;
+    for _ in 0..30 {
+        scene.step(dt, cols, rows);
+    }
+    scene.threat = Some(sim::Threat::aimed_at(scene.fly.pos, &mut rng::Rng::new(seed)));
+    for _ in 0..(after / dt) as usize {
+        scene.step(dt, cols, rows);
+    }
+    let mut f = Frame::new(cols, rows).with_colors(colors);
     scene.draw(&mut f);
     if html { f.to_html() } else { f.to_text() }
 }

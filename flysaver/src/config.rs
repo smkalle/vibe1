@@ -152,6 +152,23 @@ pub enum BrainMode {
     Decorative,
 }
 
+/// Who steers the fly.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Pilot {
+    /// The live brain's output neurons override the instincts (needs brain = live).
+    Brain,
+    /// The procedural instinct layer alone: the original's control condition.
+    Instincts,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Eyes {
+    /// The red-eyed mutant.
+    Red,
+    /// The theme's firing colour, as before.
+    Theme,
+}
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub fps: f32,
@@ -166,6 +183,9 @@ pub struct Config {
     pub brain: BrainMode,
     pub brain_steps: usize,
     pub vivid: bool,
+    pub pilot: Pilot,
+    pub threats: bool,
+    pub eyes: Eyes,
     pub glitch: bool,
     pub hud: bool,
 }
@@ -185,6 +205,9 @@ impl Default for Config {
             brain: BrainMode::Live,
             brain_steps: 1,
             vivid: true,
+            pilot: Pilot::Brain,
+            threats: true,
+            eyes: Eyes::Red,
             glitch: true,
             hud: true,
         }
@@ -226,6 +249,17 @@ impl Config {
                 },
                 ("brain_steps", Value::Num(n)) => { self.brain_steps = (*n as usize).clamp(1, 4); true }
                 ("vivid", Value::Bool(b)) => { self.vivid = *b; true }
+                ("pilot", Value::Str(s)) => match s.as_str() {
+                    "brain" => { self.pilot = Pilot::Brain; true }
+                    "instincts" => { self.pilot = Pilot::Instincts; true }
+                    _ => false,
+                },
+                ("threats", Value::Bool(b)) => { self.threats = *b; true }
+                ("eyes", Value::Str(s)) => match s.as_str() {
+                    "red" => { self.eyes = Eyes::Red; true }
+                    "theme" => { self.eyes = Eyes::Theme; true }
+                    _ => false,
+                },
                 ("glitch", Value::Bool(b)) => { self.glitch = *b; true }
                 ("hud", Value::Bool(b)) => { self.hud = *b; true }
                 _ => false,
@@ -310,6 +344,14 @@ mod tests {
         assert_eq!((c.brain, c.brain_steps, c.vivid), (BrainMode::Live, 1, true));
         assert!(c.apply(&parse_flat_toml("brain = \"decorative\"\nbrain_steps = 9\nvivid = false\n")).is_empty());
         assert_eq!((c.brain, c.brain_steps, c.vivid), (BrainMode::Decorative, 4, false));
+    }
+
+    #[test]
+    fn pilot_threat_and_eye_keys() {
+        let mut c = Config::default();
+        assert_eq!((c.pilot, c.threats, c.eyes), (Pilot::Brain, true, Eyes::Red));
+        assert!(c.apply(&parse_flat_toml("pilot = \"instincts\"\nthreats = false\neyes = \"theme\"\n")).is_empty());
+        assert_eq!((c.pilot, c.threats, c.eyes), (Pilot::Instincts, false, Eyes::Theme));
     }
 
     #[test]

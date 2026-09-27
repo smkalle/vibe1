@@ -1,10 +1,10 @@
 //! The senses: what the room and the fly's own motion do to its afferents. A port of
-//! "A fly in the Matrix" (web/senses.js and Life.senses in web/life.js), with one
-//! adaptation: this room has no swatting hand, so the looming detectors see the
-//! landing surface expanding during the final approach instead.
+//! "A fly in the Matrix" (web/senses.js and Life.senses in web/life.js). The
+//! looming detectors see the swatter (sim::Threat), as the original's see the
+//! visitor's hand: the rate of its angular expansion, with a short memory.
 
 use crate::math::{Basis, V3};
-use crate::sim::{Fly, Mode, BANANA, BREAD};
+use crate::sim::{Fly, BANANA, BREAD};
 
 const HALTERE_TONE: f64 = 0.5;
 const OCELLUS_ELEVATION: f32 = 45.0 * std::f32::consts::PI / 180.0;
@@ -17,8 +17,9 @@ const ODOUR_CORE: f32 = 0.1;
 const ODOUR_CORE_WEIGHT: f32 = 0.85;
 const ODOUR_BASELINE: f32 = 0.05;
 const ODOUR_COMPARISON: f64 = 1.5;
-/// Distance at which an approached surface starts to loom.
-const LOOM_RANGE: f32 = 0.3;
+/// Angular expansion (rad/s) that saturates the looming drive, and its memory per step.
+const LOOM_SATURATION: f32 = 4.0;
+const LOOM_MEMORY: f64 = 0.7;
 
 /// Body rates in the original's convention: roll (right wing down +), pitch (nose down +), yaw (left turn +).
 #[derive(Clone, Copy, Debug, Default)]
@@ -28,10 +29,12 @@ pub struct Rates {
     pub yaw: f64,
 }
 
-/// Tracks the fly's angles between steps to give body rates.
+/// Tracks the fly's angles between steps to give body rates, and the looming threat.
 #[derive(Default)]
 pub struct Motion {
     last: Option<(f32, f32, f32)>,
+    last_theta: Option<f32>,
+    pub loom: f64,
 }
 
 impl Motion {
@@ -48,6 +51,28 @@ impl Motion {
         };
         self.last = Some(now);
         r
+    }
+
+    /// Looming drive from a threat of radius `radius` at `at` (None: nothing looms).
+    pub fn looming(&mut self, fly: &Fly, at: Option<V3>, radius: f32, dt: f32) -> f64 {
+        let expansion = match at {
+            Some(p) => {
+                let d = (p - fly.pos).len().max(0.005);
+                let theta = 2.0 * (radius / d).atan();
+                let rate = match self.last_theta {
+                    Some(last) if dt > 0.0 => ((theta - last) / dt).max(0.0) / LOOM_SATURATION,
+                    _ => 0.0,
+                };
+                self.last_theta = Some(theta);
+                rate as f64
+            }
+            None => {
+                self.last_theta = None;
+                0.0
+            }
+        };
+        self.loom = (LOOM_MEMORY * self.loom + expansion).min(1.0);
+        self.loom
     }
 }
 
@@ -97,20 +122,8 @@ fn odour(fly: &Fly, b: &Basis, source: V3) -> [f64; 2] {
     ]
 }
 
-/// The surface the fly is landing on, expanding in its view.
-fn looming(fly: &Fly) -> f64 {
-    let Some(spot) = fly.spot else { return 0.0 };
-    match fly.mode {
-        Mode::Approach | Mode::Landing => {
-            let d = (spot.pos() - fly.pos).len();
-            clamp01(((LOOM_RANGE - d) / LOOM_RANGE) as f64 * 0.8)
-        }
-        _ => 0.0,
-    }
-}
-
-/// Every channel's level in [0, 1], by population name.
-pub fn sense(fly: &Fly, rates: Rates) -> Vec<(&'static str, f64)> {
+/// Every channel's level in [0, 1], by population name. `loom` comes from Motion::looming.
+pub fn sense(fly: &Fly, rates: Rates, loom: f64) -> Vec<(&'static str, f64)> {
     let b = Basis::from_euler(fly.yaw, fly.pitch, fly.roll);
     let flying = fly.airborne();
     let tone = if flying { HALTERE_TONE } else { 0.0 };
@@ -119,7 +132,6 @@ pub fn sense(fly: &Fly, rates: Rates) -> Vec<(&'static str, f64)> {
     let (fl, fr) = (optic_flow(rates, true), optic_flow(rates, false));
     let [bl, br] = odour(fly, &b, BANANA);
     let [yl, yr] = odour(fly, &b, BREAD);
-    let loom = looming(fly);
     let sugar = if fly.feeding { 1.0 } else { 0.0 };
     vec![
         ("haltere:left", tone),
@@ -144,6 +156,7 @@ pub fn sense(fly: &Fly, rates: Rates) -> Vec<(&'static str, f64)> {
         ("grn:sugar:front_leg", sugar),
         ("leg_touch", if flying { 0.0 } else { 0.6 }),
         ("dan:pam", if fly.feeding { 0.8 } else { 0.0 }),
+        ("dan:ppl1", if fly.punish > 0.0 { 0.8 } else { 0.0 }),
     ]
 }
 
@@ -151,7 +164,7 @@ pub fn sense(fly: &Fly, rates: Rates) -> Vec<(&'static str, f64)> {
 mod tests {
     use super::*;
     use crate::rng::Rng;
-    use crate::sim::Spot;
+    use crate::sim::Mode;
 
     fn level(s: &[(&str, f64)], name: &str) -> f64 {
         s.iter().find(|(n, _)| *n == name).map(|(_, v)| *v).unwrap()
@@ -166,27 +179,27 @@ mod tests {
     #[test]
     fn flight_tone_and_airspeed_only_in_flight() {
         let mut f = fly();
-        let s = sense(&f, Rates::default());
+        let s = sense(&f, Rates::default(), 0.0);
         assert_eq!(level(&s, "haltere:left"), 0.5);
         assert!(level(&s, "jo:C:left") > 0.1);
         assert_eq!(level(&s, "leg_touch"), 0.0);
         f.mode = Mode::Sitting;
-        let s = sense(&f, Rates::default());
+        let s = sense(&f, Rates::default(), 0.0);
         assert_eq!((level(&s, "haltere:left"), level(&s, "jo:C:left"), level(&s, "leg_touch")), (0.0, 0.0, 0.6));
     }
 
     #[test]
     fn level_flight_ocelli_see_the_sky_equally() {
-        let s = sense(&fly(), Rates::default());
+        let s = sense(&fly(), Rates::default(), 0.0);
         let (l, r) = (level(&s, "ocelli:left"), level(&s, "ocelli:right"));
         assert!((l - r).abs() < 1e-6 && l > 0.5, "{l} {r}");
     }
 
     #[test]
     fn a_turn_drives_the_optic_flow_cells_apart() {
-        let s = sense(&fly(), Rates { yaw: 10.0, ..Rates::default() });
+        let s = sense(&fly(), Rates { yaw: 10.0, ..Rates::default() }, 0.0);
         assert!(level(&s, "lptc:hs:left") > 0.7 && level(&s, "lptc:hs:right") < 0.3);
-        let still = sense(&fly(), Rates::default());
+        let still = sense(&fly(), Rates::default(), 0.0);
         assert_eq!(level(&still, "lptc:hs:left"), 0.5);
     }
 
@@ -194,25 +207,34 @@ mod tests {
     fn banana_smells_like_decaying_fruit_up_close() {
         let mut f = fly();
         f.pos = BANANA + crate::math::v3(0.05, 0.1, 0.0);
-        let s = sense(&f, Rates::default());
+        let s = sense(&f, Rates::default(), 0.0);
         assert!(level(&s, "orn:decaying_fruit:left") > 0.3);
         assert!(level(&s, "orn:decaying_fruit:left") > level(&s, "orn:yeasty:left"));
         f.pos = crate::math::v3(0.3, 1.9, 0.3);
-        let far = sense(&f, Rates::default());
+        let far = sense(&f, Rates::default(), 0.0);
         assert!(level(&far, "orn:decaying_fruit:left") < 0.1);
     }
 
     #[test]
-    fn feeding_tastes_sugar_and_landing_looms() {
+    fn feeding_tastes_sugar_and_a_swatter_looms() {
         let mut f = fly();
         f.feeding = true;
         f.mode = Mode::Sitting;
-        assert_eq!(level(&sense(&f, Rates::default()), "grn:sugar:labellum"), 1.0);
-        let mut f = fly();
-        f.mode = Mode::Landing;
-        f.spot = Some(Spot::Banana);
-        f.pos = Spot::Banana.pos() + crate::math::v3(0.0, 0.05, 0.0);
-        assert!(level(&sense(&f, Rates::default()), "vis:LPLC2") > 0.4);
+        assert_eq!(level(&sense(&f, Rates::default(), 0.0), "grn:sugar:labellum"), 1.0);
+        // An approaching swatter looms; nothing looms once it is gone.
+        let f = fly();
+        let mut m = Motion::default();
+        let mut loom = 0.0;
+        for k in 0..20 {
+            let at = f.pos + crate::math::v3(0.6 - 0.025 * k as f32, 0.0, 0.0);
+            loom = m.looming(&f, Some(at), crate::sim::SWATTER_R, 1.0 / 30.0);
+        }
+        assert!(loom > 0.4, "{loom}");
+        assert_eq!(level(&sense(&f, Rates::default(), loom), "vis:LPLC2"), loom);
+        for _ in 0..30 {
+            loom = m.looming(&f, None, crate::sim::SWATTER_R, 1.0 / 30.0);
+        }
+        assert!(loom < 0.01);
     }
 }
 
@@ -225,7 +247,7 @@ mod through_the_wiring {
 
     fn settle(fly: &Fly, rates: Rates, steps: usize, b: &mut Brain) {
         b.clear_stimuli();
-        for (n, l) in sense(fly, rates) {
+        for (n, l) in sense(fly, rates, 0.0) {
             b.stimulate(n, l);
         }
         for _ in 0..steps {

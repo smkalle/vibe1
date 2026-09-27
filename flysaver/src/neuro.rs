@@ -284,7 +284,6 @@ impl Brain {
         self.steps += 1;
     }
 
-    #[cfg(test)]
     pub fn mean(&self, name: &str) -> f64 {
         match self.sets.get(name) {
             Some(idx) if !idx.is_empty() => idx.iter().map(|&i| self.s[i as usize]).sum::<f64>() / idx.len() as f64,

@@ -349,3 +349,7 @@ A report from a real Omarchy desktop showed the screensaver rendering entirely i
 ### Live brain (Phase 1)
 
 Specified and measured in [flysaver-live-brain.md](flysaver-live-brain.md). This supersedes Q6 ("skip the real simulation"): the default is now the live rate model, with `brain = "decorative"` as the lighter option.
+
+### The brain flies (Phase 2)
+
+Specified and measured in [flysaver-brain-pilot.md](flysaver-brain-pilot.md): the live brain's output neurons steer the fly, a swatter tests the giant fibre, and the fly is a red-eyed mutant.

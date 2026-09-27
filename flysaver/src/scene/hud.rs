@@ -47,6 +47,9 @@ pub struct LiveInfo {
 
 pub struct HudInfo<'a> {
     pub live: Option<LiveInfo>,
+    pub pilot: &'a str,
+    /// The brain's latest decision, shown for a few seconds.
+    pub note: Option<&'a str>,
     pub fly: &'a Fly,
     pub camera: &'a str,
     pub neurons_drawn: usize,
@@ -75,7 +78,11 @@ pub fn draw(f: &mut Frame, theme: &Theme, info: &HudInfo) {
     if let Some(s) = fly.spot.filter(|_| !fly.airborne() || fly.mode == crate::sim::Mode::Approach) {
         status.push_str(&format!(" · {}", s.name()));
     }
+    status = format!("{} · {status}", info.pilot);
     let row = f.rows as i32 - 4;
+    if let Some(note) = info.note {
+        f.text(2, row - 1, &fit(&format!("› {note}"), w - 4), theme.eyes);
+    }
     f.text(2, row, &fit(&status, w - 4), theme.title);
     let mut second = match &info.live {
         Some(l) => {

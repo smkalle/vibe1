@@ -11,7 +11,7 @@ use crate::neuro;
 use crate::senses::{self, Motion};
 use crate::raster::{line3, Cam};
 use crate::rng::{hash01, Rng};
-use crate::sim::{Event, Fly, BRAIN_CENTER, BRAIN_SCALE};
+use crate::sim::{Command, Event, Fly, BRAIN_CENTER, BRAIN_SCALE, SWATTER_R};
 use crate::theme::Theme;
 use std::f32::consts::TAU;
 
@@ -76,6 +76,27 @@ const WARM_UP: usize = 40;
 /// Activity below this is not drawn.
 const SHOW_LEVEL: f64 = 0.02;
 
+// The brain layer's readouts and constants, as the original's web/life.js declares them.
+const DNA02_L: &str = "dn:DNa02:left";
+const DNA02_R: &str = "dn:DNa02:right";
+const DNP09: &str = "dn:DNp09";
+const LANDING: &str = "dn:landing";
+const GIANT_FIBRE: &str = "gf";
+const MN9: &str = "mn9";
+const GROOMING: &str = "dn:grooming";
+const MBON_APPROACH: &str = "mbon:MBON11:right";
+const MBON_AVOID: &str = "mbon:MBON05:left";
+const READOUTS: [&str; 9] = [DNA02_L, DNA02_R, DNP09, LANDING, GIANT_FIBRE, MN9, GROOMING, MBON_APPROACH, MBON_AVOID];
+const K_TURN: f64 = 6.0;
+const TURN_DEADBAND: f64 = 0.02;
+const K_SPEED: f64 = 0.6;
+const LAND_LEVEL: f64 = 0.15;
+const ESCAPE_LEVEL: f64 = 0.5;
+const FEED_LEVEL: f64 = 0.2;
+const GROOM_LEVEL: f64 = 0.15;
+/// The page's softmax temperature for the mushroom body's choice.
+const MB_TEMPERATURE: f64 = 0.3;
+
 /// The live rate model and what it needs between frames.
 pub struct Live {
     pub net: neuro::Brain,
@@ -86,6 +107,45 @@ pub struct Live {
     pub ms_per_step: f32,
     /// Neurons at or above half activation (the original's "active" count).
     pub active: usize,
+    /// Readouts (means of READOUTS) now, and at level-flight rest after warm-up.
+    pub read: [f64; 9],
+    baseline: Option<[f64; 9]>,
+}
+
+impl Live {
+    fn dev(&self, k: usize) -> f64 {
+        self.read[k] - self.baseline.map_or(0.0, |b| b[k])
+    }
+
+    /// What the output neurons ask the body to do (life.js "the brain layer").
+    pub fn command(&self) -> Command {
+        let asym = self.dev(1) - self.dev(0);
+        Command {
+            turn_rate: if asym.abs() > TURN_DEADBAND { (K_TURN * asym) as f32 } else { 0.0 },
+            speed_factor: (1.0 + K_SPEED * self.dev(2)).clamp(0.3, 1.5) as f32,
+            land: self.dev(3) > LAND_LEVEL,
+            escape: self.read[4] > ESCAPE_LEVEL,
+            feed: self.read[5] > FEED_LEVEL,
+            groom: self.dev(6) > GROOM_LEVEL,
+        }
+    }
+
+    /// The mushroom body's probability of approaching: a softmax over MBON11
+    /// (approach, GABAergic) and MBON05 (avoid, glutamatergic), Aso et al. 2014.
+    pub fn p_approach(&self) -> f64 {
+        let (a, v) = (self.read[7] / MB_TEMPERATURE, self.read[8] / MB_TEMPERATURE);
+        let m = a.max(v);
+        let (ea, ev) = ((a - m).exp(), (v - m).exp());
+        ea / (ea + ev)
+    }
+
+    pub fn giant_fibre(&self) -> f64 {
+        self.read[4]
+    }
+
+    pub fn turn_asym(&self) -> f64 {
+        self.dev(1) - self.dev(0)
+    }
 }
 
 pub struct Brain {
@@ -109,6 +169,8 @@ impl Brain {
             warm: false,
             ms_per_step: 0.0,
             active: 0,
+            read: [0.0; 9],
+            baseline: None,
         });
         Brain { net, act: vec![0.0; n], wave: 2.0, angle: 0.0, bucket: 0, bucket_t: 0.0, live }
     }
@@ -117,10 +179,11 @@ impl Brain {
         self.net.pos.len()
     }
 
-    fn step_live(live: &mut Live, dt: f32, fly: &Fly) {
+    fn step_live(live: &mut Live, dt: f32, fly: &Fly, threat: Option<crate::math::V3>) {
         let rates = live.motion.rates(fly, dt);
+        let loom = live.motion.looming(fly, threat, SWATTER_R, dt);
         live.net.clear_stimuli();
-        for (name, level) in senses::sense(fly, rates) {
+        for (name, level) in senses::sense(fly, rates, loom) {
             live.net.stimulate(name, level);
         }
         let steps = if live.warm { live.steps_per_frame } else { WARM_UP };
@@ -132,6 +195,12 @@ impl Brain {
         let ms = t.elapsed().as_secs_f32() * 1e3 / steps as f32;
         live.ms_per_step = if live.ms_per_step == 0.0 { ms } else { live.ms_per_step * 0.9 + ms * 0.1 };
         live.active = live.net.active_count(0.5);
+        for (k, name) in READOUTS.iter().enumerate() {
+            live.read[k] = live.net.mean(name);
+        }
+        if live.baseline.is_none() {
+            live.baseline = Some(live.read); // the level-flight rest, right after warm-up
+        }
     }
 
     fn kick(&mut self, r: u8, v: f32) {
@@ -140,10 +209,10 @@ impl Brain {
         }
     }
 
-    pub fn step(&mut self, dt: f32, fly: &Fly, rng: &mut Rng) {
+    pub fn step(&mut self, dt: f32, fly: &Fly, threat: Option<crate::math::V3>, rng: &mut Rng) {
         self.angle = (self.angle + dt * 0.22) % TAU;
         if let Some(live) = &mut self.live {
-            Brain::step_live(live, dt, fly);
+            Brain::step_live(live, dt, fly, threat);
             return;
         }
         for a in &mut self.act {
@@ -164,6 +233,16 @@ impl Brain {
                 Event::Land => {
                     self.kick(LEGS, 0.9);
                     self.kick(LEG_MOTOR, 0.8);
+                }
+                Event::Escape => {
+                    self.kick(DESCENDING, 1.0);
+                    self.kick(WING_MOTOR, 1.0);
+                    self.kick(LEG_MOTOR, 1.0);
+                }
+                Event::Hit => {
+                    for r in 0..18 {
+                        self.kick(r, 0.8);
+                    }
                 }
             }
         }

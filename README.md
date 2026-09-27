@@ -14,3 +14,6 @@ pip install -r requirements.txt
 python examples/server_minimal.py
 curl -s -X POST localhost:8000/predict -H "content-type: application/json" -d '{"input": 4}'
 ```
+
+## Also in this repo: flysaver
+`flysaver/` is a separate project: *A fly in the Matrix* as an Omarchy screensaver (Rust). See [`flysaver/README.md`](flysaver/README.md) and the spec in [`specs/omarchy-fly-matrix-screensaver.md`](specs/omarchy-fly-matrix-screensaver.md).

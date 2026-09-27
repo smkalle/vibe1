@@ -1,0 +1,17 @@
+--- a/bin/omarchy-screensaver
++++ b/bin/omarchy-screensaver
+@@ -2,6 +2,14 @@
+ 
+ # omarchy:summary=Run the Omarchy screensaver using random effects from TTE.
+ 
++# Let the user replace the screensaver program. It runs in the same terminal
++# window and must follow the same contract: exit on any input or when the
++# window loses focus, and close every monitor's screensaver on the way out.
++user_screensaver=~/.config/omarchy/screensaver/run
++if [[ -x $user_screensaver ]]; then
++  exec "$user_screensaver" "$@"
++fi
++
+ screensaver_in_focus() {
+   hyprctl activewindow -j | jq -e '.class == "org.omarchy.screensaver"' >/dev/null 2>&1
+ }

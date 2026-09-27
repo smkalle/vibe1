@@ -1,0 +1,14 @@
+# flysaver: A fly in the Matrix, as an Omarchy screensaver.
+# Copy to ~/.config/omarchy/flysaver.toml (install does this for you).
+# Every key is optional.
+
+fps = 30                 # 5-60
+battery_fps = 20         # used while on battery
+rain_density = 0.45      # 0-1 share of columns raining
+rain_glyphs = "katakana" # katakana | ascii
+layers = ["rain", "room", "brain", "fly", "hud"]   # add "logo" to show screensaver.txt
+brain_points = 8000      # 500-20000 neurons drawn
+camera = "cycle"         # cycle | follow | room | brain
+palette = "theme"        # theme (current Omarchy theme) | matrix (the original's green)
+glitch = true
+hud = true

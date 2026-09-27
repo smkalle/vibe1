@@ -1,6 +1,6 @@
 # Spec: "Fly in the Matrix" screensaver for Omarchy
 
-**Status:** DRAFT, waiting for sign-off. Nothing gets built until this is approved.
+**Status:** APPROVED with the recommendations in §11 (2026-09-27). Built in [`flysaver/`](../flysaver/). §6 and §8 were revised during the build; see §13.
 **Working name:** `flysaver` (binary), shown to users as "Fly in the Matrix".
 **Inspiration:** [A fly in the Matrix](https://floatingpragma.io/cadence-examples/fly-matrix/) by Bernhard Mueller / Pragma Research ([source](https://github.com/Jarikononen/cadence-examples/tree/main/fly-matrix), MIT).
 
@@ -284,3 +284,41 @@ The code is split into these modules:
 - Fly in the Matrix (live): https://floatingpragma.io/cadence-examples/fly-matrix/
 - Fly in the Matrix (source, MIT): https://github.com/Jarikononen/cadence-examples/tree/main/fly-matrix
 - BANC connectome release 888 (CC BY), as cited in the example's README
+
+## 13. Build notes (post sign-off)
+
+These are the decisions from §11 as built: terminal-native, Rust, the brain as a hologram in the room, the logo off by default, theme colours on an always-dark background, no live simulation, `flysaver/` in this repo, and the name `flysaver`.
+
+**§6 changed: a PATH shim, not a patch.** On a current Omarchy install `OMARCHY_PATH` is `/usr/share/omarchy`, owned by the `omarchy` pacman package. It's no longer a git checkout in `$HOME`. Patching `omarchy-screensaver` would need root and would fight pacman.
+
+Instead, `flysaver install` does three things:
+
+- writes `~/.config/uwsm/env.d/99-flysaver`, which puts `~/.local/share/flysaver/bin` first on the Hyprland session's `PATH` (Omarchy's `default/uwsm/env.d/10-omarchy` names `~/.config/uwsm/env.d/*` as the preferred place for user overrides)
+- adds a single `omarchy-screensaver` shim in that directory, which runs flysaver or falls back to the stock one
+- writes `~/.config/omarchy/screensaver/run`, so the upstream hook in `flysaver/upstream/` works unchanged if it lands
+
+With the shim, no `post-update.d` hook is needed. `flysaver launch` covers path 3 until the next login. The upstream PR itself was not opened, because this session can't reach `basecamp/omarchy`. The patch is ready and applies cleanly at `c5b4db7`.
+
+**§8 measured** at 230×65 cells, release build:
+
+| Metric | Measured | Budget |
+|---|---|---|
+| CPU | 0.7–0.8 ms/frame, 2.2–2.3% of a core at 30 fps | ≤ 5%, met |
+| Terminal output | 0.4–0.6 MB/s | ≤ 300 KB/s, **missed** |
+| Exit | ≤ 2 ms on key/mouse; ~45 ms on focus loss | ≤ 50 / 300 ms, met |
+
+The output budget is missed because the orbiting camera moves every wireframe line on every frame. Quantised brightness and relative cursor moves halved it, from 1.6 MB/s. Going further would mean choppier camera motion. GPU terminals handle this rate easily. `fps` and `battery_fps` are the knobs if it matters.
+
+**Milestones.**
+
+- M1–M3 and M5 are done.
+- M4 is partly done: the glitches and the logo layer are in. The compound-eye and close-up insets are **not** built. They're still stretch goals.
+
+**Tests.**
+
+- Unit tests and golden frames: `cargo test`
+- Exit and restore in a real PTY: `tests/pty_lifecycle.py`
+- Focus, pointer and close-all against a fake Hyprland: `tests/hypr_contract.py`
+- Install, shim, fallback and uninstall: `tests/install_roundtrip.sh`
+
+Not yet verified on a real Omarchy/Hyprland desktop. This build environment has no display.

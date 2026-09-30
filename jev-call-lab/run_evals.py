@@ -115,12 +115,13 @@ def e4_seed(results):
 
 
 # E5 ------------------------------------------------------------------------
-def e5_signal(results, train_calls, test_calls):
+def e5_signal(results, train_calls, test_calls, syn_results, synthetic):
+    """Gate on SGD test; report the synthetic set (5-fold baselines) alongside."""
     m = evaluate.metrics(results)
-    b = baselines.evaluate_all(train_calls, test_calls)
     ok = (m["auc"]["pre_outcome"] or 0) >= 0.70 and (m["auc"]["end"] or 0) >= 0.95
-    rows = {"jev": m["auc"], **{k: v["auc"] for k, v in b.items()}}
-    return ok, rows, []
+    sgd = {"jev": m["auc"], **{k: v["auc"] for k, v in baselines.evaluate_all(train_calls, test_calls).items()}}
+    syn = {"jev": evaluate.metrics(syn_results)["auc"], **baselines.cross_validate(synthetic)}
+    return ok, {"sgd_test (baselines trained on sgd_train)": sgd, "synthetic (baselines 5-fold)": syn}, []
 
 
 # E6 ------------------------------------------------------------------------
@@ -173,7 +174,7 @@ def e7_cost(results, all_sgd_calls):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--results", help="SGD test results from simulate.py (default: simulate now)")
-    ap.add_argument("--seed-results", help="seed/synthetic results (default: simulate now)")
+    ap.add_argument("--synthetic-results", help="results for data/synthetic_calls.json (default: simulate now)")
     ap.add_argument("--live", action="store_true", help="report E4/E5 instead of gating them")
     ap.add_argument("--out", default=str(HERE / "evals" / "REPORT.md"))
     args = ap.parse_args()
@@ -183,19 +184,26 @@ def main():
     utterance_words = set(json.loads((DATA / "sgd_utterance_vocab.json").read_text()))
 
     seed_calls = [c for c in synthetic if c["call_id"] in {"book-001", "fail-002", "recover-003"}]
-    seed_results = json.loads(Path(args.seed_results).read_text()) if args.seed_results else run(seed_calls, quiet=True)
-    test_results = json.loads(Path(args.results).read_text()) if args.results else run(sgd["test"], workers=8, quiet=True)
-    if not args.results:
-        (HERE / "results").mkdir(exist_ok=True)
+    (HERE / "results").mkdir(exist_ok=True)
+    if args.synthetic_results:
+        syn_results = json.loads(Path(args.synthetic_results).read_text())
+    else:
+        syn_results = run(synthetic, workers=8, quiet=True)
+        (HERE / "results" / "synthetic_mock.json").write_text(json.dumps(syn_results, indent=1))
+    if args.results:
+        test_results = json.loads(Path(args.results).read_text())
+    else:
+        test_results = run(sgd["test"], workers=8, quiet=True)
         (HERE / "results" / "sgd_test_mock.json").write_text(json.dumps(test_results, indent=1))
+    seed_results = [r for r in syn_results if r["call_id"] in {c["call_id"] for c in seed_calls}]
 
     all_calls = synthetic + sgd["train"] + sgd["dev"] + sgd["test"]
     evals = [
-        ("E1", "Contract", True, e1_contract(seed_results + test_results)),
+        ("E1", "Contract", True, e1_contract(syn_results + test_results)),
         ("E2", "No leak", True, e2_no_leak(all_calls, utterance_words)),
         ("E3", "Reducer fidelity", True, e3_reducer(all_calls)),
         ("E4", "Seed trajectories", not args.live, e4_seed(seed_results)),
-        ("E5", "Signal on SGD test", not args.live, e5_signal(test_results, sgd["train"], sgd["test"])),
+        ("E5", "Signal on SGD test", not args.live, e5_signal(test_results, sgd["train"], sgd["test"], syn_results, synthetic)),
         ("E6", "Record -> replay", True, e6_record_replay(seed_calls)),
         ("E7", "Cost accounting", True, e7_cost(test_results, sgd["train"] + sgd["dev"] + sgd["test"])),
     ]
@@ -216,11 +224,12 @@ def main():
             if problems:
                 lines += ["Problems (first 10):", ""] + [f"- {p}" for p in problems]
     lines += ["", "## SGD test trajectories and review (evaluate.py)", "", "```", evaluate.render(test_results, max_calls=4), "```"]
-    lines += ["", "## Seed trajectories", "", "```", evaluate.render(seed_results), "```", ""]
+    lines += ["", "## Seed trajectories (synthetic set summary at the bottom)", "", "```",
+              evaluate.render(seed_results).split("\n\ncalls=")[0], "", evaluate.render(syn_results, max_calls=0), "```", ""]
     lines.insert(1, f"\n**Overall: {'PASS' if all_ok else 'FAIL'}** (Jev mode: {jev_client.mode()})\n")
     Path(args.out).parent.mkdir(exist_ok=True)
     Path(args.out).write_text("\n".join(lines))
-    print("\n".join(lines[:14]))
+    print("\n".join(lines[:12]))
     print(f"\nwrote {args.out}")
     raise SystemExit(0 if all_ok else 1)
 

@@ -248,9 +248,15 @@ def test_forecast_points_are_agent_and_tool_events(seed_calls):
 def test_forecast_call_and_pre_outcome(seed_calls):
     r = forecast_call(seed_calls["book-001"])
     assert len(r["turns"]) == 7 and r["review"]
-    assert r["first_booking_index"] == 8
+    assert r["first_booking_index"] == 8 and r["decision_index"] == 8
     pre = evaluate.pre_outcome(r)
-    assert pre["event_index"] < 8
+    assert pre["event_index"] == 6  # offered_two_slots, before the booking tool call
+
+
+def test_decision_index_cuts_unbooked_calls_before_their_ending(seed_calls):
+    from simulate import decision_index
+    ev = seed_calls["fail-002"]["events"]
+    assert ev[decision_index(ev)]["event"] == "hung_up"
 
 
 def test_auc_and_brier():

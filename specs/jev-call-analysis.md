@@ -1,6 +1,6 @@
 # Spec: jev-call-lab, structure-only call analysis with Jev
 
-**Status:** SPEC, awaiting build → evals → sign-off.
+**Status:** BUILT and EVALUATED on the mock (2026-09-30). Awaiting user sign-off and a live run with a key (§9). Results are in §10.
 **Source:** the "Build a Sully-style call-structure analyzer with Jev on OpenRouter" tutorial (the tutorial below).
 **Lives in:** `jev-call-lab/` (standalone, no LitServe/MCP coupling, per decision D3).
 
@@ -72,7 +72,7 @@ The TypeSafe SDK source was checked (`typesafe-sdk` 0.7.2 from PyPI, whose schem
 | USER `REQUEST` slots | caller | `asked_info` + slots | info | ✓ |
 | USER `REQUEST_ALTS` | caller | `asked_for_alternatives` | offer | ✓ |
 | USER `SELECT` | caller | `selected_offer` | offer | ✓ |
-| USER `AFFIRM` / `NEGATE` | caller | `affirmed` / `declined` | confirm | ✓ / ✗ |
+| USER `AFFIRM` / `NEGATE` | caller | `affirmed` / `declined` (a `NEGATE` answering `REQ_MORE` becomes `nothing_else`, wrapup, ✓) | confirm | ✓ / ✗ |
 | USER `AFFIRM_INTENT` / `NEGATE_INTENT` | caller | `accepted_booking_offer` / `declined_booking_offer` | details / wrapup | ✓ / ✗ |
 | USER `THANK_YOU`, `GOODBYE` | caller | `thanked`, `said_goodbye` | wrapup | ✓ |
 | SYSTEM service_call FindProvider | tool | `search_providers` (`tool=find_provider`, `n_results`) | discovery | n>0 |
@@ -90,7 +90,7 @@ The TypeSafe SDK source was checked (`typesafe-sdk` 0.7.2 from PyPI, whose schem
 - In a system turn, the tool event comes **before** the agent's events, because the service call happens before the reply.
 - **Timing is synthetic** (SGD is text): turn duration = `900 ms + 320 ms × word_count` and tool latency is 1500 ms. Only word *counts* are used, never words.
 - `label_booked` = any `NOTIFY_SUCCESS`. Eval E3 checks that this equals "some `create_appointment` returned ok".
-- The profile seen during spec: 431 booked / 331 not; 75 booked calls **recover from a failed booking** (the Sully bias case); 227 unbooked calls never state a booking intent.
+- Built: train 551 (360 booked), dev 44 (37), test 167 (81). The SGD **test split holds unseen services and flows** (salon + therapist only; therapist never appears in train). The profile seen during spec: 431 booked / 331 not; 75 booked calls **recover from a failed booking** (the Sully bias case); 227 unbooked calls never state a booking intent.
 
 ### 4.4 Known limitations of SGD as a stand-in
 
@@ -122,7 +122,8 @@ Only the known question names get specific answers; any other question gets a ne
 
 - **Forecast points:** every event with `actor ∈ {agent, tool}`. The state is `events[: i+1]` (prefix only).
 - **mid:** the forecast at the middle forecast point.
-- **pre-outcome:** the last forecast strictly before the first `create_appointment` tool event, or before `call_ended` if there is none. This is the honest "before it's decided" point.
+- **pre-outcome:** the last forecast strictly before the first event whose stage is `booking`, `wrapup` or `complete`. *(Changed during the build. The first definition, "before the first `create_appointment`", cut booked calls early but let unbooked calls run to their goodbye, which inflated AUC to 0.99.)*
+- **pre-outcome, attempted subset:** the same point, but only on calls that stated a booking intent before it: "will this attempt land?". It is reported as `null` when either class has fewer than 5 calls.
 - **end:** the last forecast. This is a sanity check and should be close to 1.0.
 - **AUC:** Mann–Whitney with ties counted as 0.5. **Brier:** mean (p − y)².
 - **Cost:** Σ cost over all requests. **Projection:** tokens per request × requests for the full SGD set × price.
@@ -135,7 +136,7 @@ Only the known question names get specific answers; any other question gets a ne
 | E2 | **No leak:** each prefix state equals `events[:i+1]`. `state` has no `call_id`, no `label*` and no word from any SGD utterance outside the closed event/slot/stage vocabulary | 100% |
 | E3 | **Reducer fidelity:** `label_booked` ⇔ ok `create_appointment`; starts `call_started` and ends `call_ended`; `t_ms` strictly increasing; every event name is in the vocabulary; counts are reported | 100% |
 | E4 | **Seed trajectories:** book-001 ends > 0.8 and rises after `accepted_slot`; fail-002 ends < 0.2; recover-003 dips after the first failure, then ends > 0.8 | pass |
-| E5 | **Signal on the SGD test split:** pre-outcome AUC ≥ 0.70 and end AUC ≥ 0.95, with baselines B0–B2 reported alongside | pass (mock) |
+| E5 | **Signal on the SGD test split:** pre-outcome AUC ≥ 0.70 and end AUC ≥ 0.95, with baselines B0–B2 (trained on SGD train) reported alongside. Also reported: the full synthetic set, with 5-fold baselines | pass (mock) |
 | E6 | **Record → replay:** record through the local HTTP mock server, then replay; results are identical and a replay miss is a hard error | pass |
 | E7 | **Cost accounting:** cost source reported; projected live cost of a full SGD run (forecasts + reviews) | < $1 |
 
@@ -157,14 +158,38 @@ If the smoke test returns 404, set `JEV_URL=https://openrouter.ai/api/v1/systemo
 
 ## 9. Sign-off checklist
 
-- [ ] E1–E7 pass on the mock (see `jev-call-lab/evals/REPORT.md`)
-- [ ] pytest suite green
-- [ ] No key in the repo; `state` is structure-only; prefixes never include future events
-- [ ] Multiple questions share one request when they share one state
-- [ ] `usage`, cost (with its source) and latency are logged per request
-- [ ] Labels come from SGD / generator ground truth, never from Jev
-- [ ] User: live smoke test and a live E1–E7 run with a key
+- [x] E1–E7 pass on the mock (see `jev-call-lab/evals/REPORT.md`)
+- [x] pytest suite green (26 tests, offline)
+- [x] No key in the repo; `state` is structure-only (E2); prefixes never include future events (E2)
+- [x] Multiple questions share one request when they share one state (the review is one request)
+- [x] `usage`, cost (with its source) and latency are logged per request
+- [x] Labels come from SGD / generator ground truth, never from Jev (E3)
+- [ ] **User:** review this spec and the eval report, and sign off on the approach
+- [ ] **User:** `python jev_client.py --smoke` with a key (confirms the unverified endpoint and model id)
+- [ ] **User:** a live `record` run on synthetic + SGD test (about $0.06), then `run_evals.py --live`
 
 ## 10. Results
 
-_Filled in after the build (§7 evals)._
+All numbers below come from the **mock** (`mock-jev-heuristic`, hand-set weights, not Jev). They validate the pipeline and set the baselines Jev has to beat; they say nothing about Jev yet.
+
+**Gates:** E1 2,879/2,879 responses valid · E2 8,710 prefix states, no id/label/transcript word · E3 915 calls valid, labels consistent · E4 all 5 seed checks · E5 pass · E6 24 fixtures recorded over HTTP, replay identical, replay miss raises · E7 pass.
+
+**AUC** (the mock row is the pipeline check; B-rows are what live Jev has to beat):
+
+| Set | Scorer | mid | pre-outcome | pre-outcome, attempted | end |
+|---|---|---|---|---|---|
+| SGD test (167) | mock | 0.952 | 0.957 | n/a (1 negative) | 1.000 |
+| | B1 stage reached | 0.867 | 0.965 | n/a | 0.994 |
+| | B2 logreg (trained on SGD train) | 0.870 | 0.947 | n/a | 0.992 |
+| Synthetic (153) | mock | 0.660 | 0.748 | 0.655 | 1.000 |
+| | B1 stage reached | 0.892 | 0.773 | 0.679 | 0.980 |
+| | B2 logreg (5-fold) | 0.776 | 0.780 | 0.698 | 0.999 |
+
+**Cost:** mock token estimate (4 chars/token): SGD test 1,730 requests, about 985k tokens, **$0.041**; synthetic 1,149 requests, **$0.020**. Projected full SGD (762 calls, 8,476 requests): about 5.0M tokens, **$0.21**. The live run rescales this projection with real token counts.
+
+**What we learned while building**
+
+1. **SGD is easy at pre-outcome.** Unbooked SGD calls are mostly information-only: they never state a booking intent, so "furthest stage reached" already gets 0.97. Only 1 of 78 test calls that attempted a booking failed, so SGD can't measure "will this attempt land?". The synthetic set can (53 of 131 attempts fail), and there baselines reach about 0.70. **That is the number to watch on the live run.**
+2. **The logistic baseline needed shuffled SGD training.** Unshuffled, it scored 0.55 mid AUC on test.
+3. **The tutorial leaks the label through `call_id`, and its "pre-outcome" point was asymmetric.** Both are fixed, and both are guarded by evals.
+4. The mock's `failure_mode` agrees 100% with the rule reference because it *is* the rule. On a live run, that agreement becomes a meaningful measure.

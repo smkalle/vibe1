@@ -16,6 +16,21 @@ Latest eval report: [`evals/REPORT.md`](evals/REPORT.md).
 
 Regenerate them with `python generate_synthetic.py` and `python reduce_sgd.py --fetch`.
 
+## Workbench UI
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+- **Sidebar:** mode (mock / live / record / replay), **OpenRouter key per session** (password field, held only in that browser
+  session's memory, never written to disk, results or fixtures; "Forget key" clears it), endpoint preset, URL, model, and **Test connection**.
+- **Run:** pick a dataset and number of calls, see estimated requests, tokens and cost, set a **cost cap**, then run with a progress bar.
+- **Results:** cost, latency and contract errors; AUC for Jev vs non-LLM baselines (chart + table); calibration; failure-mode confusion; save or download.
+- **Call explorer:** P(book) trajectory per call (failed events marked), turn table, review answers, and the exact JSON state Jev saw at any turn.
+- **Sign-off (E1–E7):** runs every synthetic call + the SGD test split with your connection (about $0.06 live), then the evals; saves `evals/REPORT_live.md`.
+- **Playground:** any `state` + `questions` JSON in one request.
+
 ## Run without a key (mock)
 
 ```bash

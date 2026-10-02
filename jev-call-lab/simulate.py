@@ -38,11 +38,11 @@ def attempted_booking(events: list) -> bool:
     return any(e["event"] in BOOKING_INTENT for e in events[: decision_index(events)])
 
 
-def forecast_call(call: dict, review: bool = True) -> dict:
+def forecast_call(call: dict, review: bool = True, cfg=None) -> dict:
     events = call["events"]
     turns = []
     for idx in forecast_points(events):
-        resp = decide(prefix_state(call, events[: idx + 1], idx), WILL_BOOK)
+        resp = decide(prefix_state(call, events[: idx + 1], idx), WILL_BOOK, cfg=cfg)
         turns.append({
             "event_index": idx,
             "t_ms": events[idx]["t_ms"],
@@ -70,7 +70,7 @@ def forecast_call(call: dict, review: bool = True) -> dict:
     }
     if review:
         # All five questions share one state, so they share one request.
-        resp = decide(prefix_state(call, events, len(events) - 1), REVIEW)
+        resp = decide(prefix_state(call, events, len(events) - 1), REVIEW, cfg=cfg)
         out.update(
             review=resp["answers"],
             review_errors=validate_response(REVIEW, resp),
@@ -83,9 +83,9 @@ def forecast_call(call: dict, review: bool = True) -> dict:
     return out
 
 
-def run(calls: list, workers: int = 8, review: bool = True, quiet: bool = False) -> list:
+def run(calls: list, workers: int = 8, review: bool = True, quiet: bool = False, cfg=None) -> list:
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        results = list(pool.map(lambda c: forecast_call(c, review), calls))
+        results = list(pool.map(lambda c: forecast_call(c, review, cfg), calls))
     if not quiet:
         for r in results:
             print("done", r["call_id"])

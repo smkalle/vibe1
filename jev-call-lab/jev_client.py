@@ -14,6 +14,7 @@ import json
 import math
 import os
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -50,13 +51,38 @@ def fixtures_dir() -> Path:
     return Path(os.environ.get("JEV_FIXTURES", Path(__file__).parent / "fixtures"))
 
 
+@dataclass(frozen=True)
+class Config:
+    """Settings for one run. The key is never printed (repr=False) and never written to disk."""
+
+    mode: str = "mock"
+    api_key: str | None = field(default=None, repr=False)
+    url: str = DEFAULT_URL
+    model: str = DEFAULT_MODEL
+    fixtures: Path = Path(__file__).parent / "fixtures"
+
+    def __post_init__(self):
+        if self.mode not in {"live", "mock", "record", "replay"}:
+            raise JevError(f"unknown mode {self.mode!r}")
+
+
+def config_from_env() -> Config:
+    return Config(
+        mode=mode(),
+        api_key=os.environ.get("OPENROUTER_API_KEY"),
+        url=os.environ.get("JEV_URL", DEFAULT_URL),
+        model=model(),
+        fixtures=fixtures_dir(),
+    )
+
+
 def cache_key(model_name: str, state: Any, questions: dict) -> str:
     canon = json.dumps({"model": model_name, "state": state, "questions": questions}, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canon.encode()).hexdigest()
 
 
-def _post(payload: dict, timeout: float) -> dict:
-    key = os.environ.get("OPENROUTER_API_KEY")
+def _post(payload: dict, timeout: float, cfg: Config) -> dict:
+    key = cfg.api_key
     if not key:
         raise JevError("Set OPENROUTER_API_KEY (or JEV_MODE=mock)")
     headers = {
@@ -65,13 +91,14 @@ def _post(payload: dict, timeout: float) -> dict:
         "HTTP-Referer": "https://localhost/jev-call-lab",
         "X-Title": "jev-call-lab",
     }
-    url = os.environ.get("JEV_URL", DEFAULT_URL)
+    url = cfg.url
     for attempt in range(MAX_RETRIES + 1):
         try:
             r = requests.post(url, json=payload, headers=headers, timeout=timeout)
         except requests.RequestException as e:
             if attempt == MAX_RETRIES:
-                raise JevError(f"request failed: {e}") from e
+                # requests errors carry the URL and reason, never headers, so the key cannot leak here.
+                raise JevError(f"request failed: {type(e).__name__}: {e}") from e
         else:
             if r.status_code < 400:
                 return r.json()
@@ -81,11 +108,12 @@ def _post(payload: dict, timeout: float) -> dict:
     raise AssertionError("unreachable")
 
 
-def decide(state: Any, questions: dict, timeout: float = 30.0) -> dict:
-    """One request: every question here is about the same state."""
-    m = mode()
-    payload = {"model": model(), "state": state, "questions": questions}
-    fixture = fixtures_dir() / f"{cache_key(payload['model'], state, questions)}.json"
+def decide(state: Any, questions: dict, timeout: float = 30.0, cfg: Config | None = None) -> dict:
+    """One request: every question here is about the same state. cfg defaults to the environment."""
+    cfg = cfg or config_from_env()
+    m = cfg.mode
+    payload = {"model": cfg.model, "state": state, "questions": questions}
+    fixture = cfg.fixtures / f"{cache_key(payload['model'], state, questions)}.json"
 
     t0 = time.perf_counter()
     if m == "mock":
@@ -95,7 +123,7 @@ def decide(state: Any, questions: dict, timeout: float = 30.0) -> dict:
             raise JevError(f"replay miss: no fixture {fixture.name} (record it first with JEV_MODE=record)")
         body = json.loads(fixture.read_text())["response"]
     else:
-        body = _post(payload, timeout)
+        body = _post(payload, timeout, cfg)
         if m == "record":
             fixture.parent.mkdir(parents=True, exist_ok=True)
             fixture.write_text(json.dumps({"request": payload, "response": body}, indent=1))

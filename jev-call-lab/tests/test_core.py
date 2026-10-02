@@ -281,3 +281,24 @@ def test_logistic_baseline_learns():
     assert set(out) == {"B0_constant", "B1_stage_reached", "B2_logreg_counts"}
     assert out["B0_constant"]["auc"]["end"] == 0.5
     assert out["B2_logreg_counts"]["auc"]["end"] > 0.9
+
+
+def test_per_run_config_overrides_env(seed_calls):
+    """The workbench passes the key per run; nothing comes from (or goes to) the environment."""
+    import os
+    srv = mock_jev.make_server(0)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    cfg = jev_client.Config(mode="live", api_key="sk-or-v1-secret",
+                            url=f"http://127.0.0.1:{srv.server_address[1]}/api/alpha/decisions")
+    try:
+        results = run([seed_calls["book-001"]], workers=1, quiet=True, cfg=cfg)
+    finally:
+        srv.shutdown()
+    assert results[0]["model"] == mock_jev.MOCK_MODEL
+    assert "OPENROUTER_API_KEY" not in os.environ
+    assert "secret" not in repr(cfg)
+
+
+def test_config_rejects_unknown_mode():
+    with pytest.raises(jev_client.JevError):
+        jev_client.Config(mode="bogus")

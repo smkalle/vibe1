@@ -168,6 +168,17 @@ If the smoke test returns 404, set `JEV_URL=https://openrouter.ai/api/v1/systemo
 - [ ] **User:** `python jev_client.py --smoke` with a key (confirms the unverified endpoint and model id)
 - [ ] **User:** a live `record` run on synthetic + SGD test (about $0.06), then `run_evals.py --live`
 
+## 9b. Workbench (added 2026-10-02)
+
+`jev-call-lab/app.py` (Streamlit). The key is entered per browser session and passed per run through `jev_client.Config`
+(never through environment variables, so concurrent sessions can't see each other's keys, and `repr(Config)` hides it).
+Tabs: Run, Results, Call explorer, Sign-off (E1–E7 via `run_evals.build_report`), Playground. Headless-tested with Streamlit
+`AppTest`: mock run, live run against the local mock HTTP server with a fake key, test connection, playground and a full
+mock sign-off (PASS). The key is never stored with the runs.
+
+**Live sign-off status:** not run. The sandbox's network policy denies `openrouter.ai`, so the live smoke test and live E1–E7 are
+still open (§9) and are meant to be run from the workbench's Sign-off tab.
+
 ## 10. Results
 
 All numbers below come from the **mock** (`mock-jev-heuristic`, hand-set weights, not Jev). They validate the pipeline and set the baselines Jev has to beat; they say nothing about Jev yet.

@@ -189,6 +189,6 @@ calls=153 booked=78 requests=1149 models=['mock-jev-heuristic']
 AUC   mid=0.6601 pre_outcome=0.7484 end=1.0 pre_outcome_attempted=0.6548 (n=131, not booked=53)
 Brier mid=0.2455 pre_outcome=0.1985 end=0.1394
 failure_mode agreement with rule reference: 1.0
-latency p50=0.03ms p95=0.04ms
+latency p50=0.03ms p95=0.05ms
 total USD=0.019731 (tokens_x_price), input tokens=469786
 ```

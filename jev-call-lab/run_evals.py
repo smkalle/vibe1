@@ -171,30 +171,15 @@ def e7_cost(results, all_sgd_calls):
     return ok, {"this_run": m["cost"], "projected_full_sgd": proj}, []
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--results", help="SGD test results from simulate.py (default: simulate now)")
-    ap.add_argument("--synthetic-results", help="results for data/synthetic_calls.json (default: simulate now)")
-    ap.add_argument("--live", action="store_true", help="report E4/E5 instead of gating them")
-    ap.add_argument("--out", default=str(HERE / "evals" / "REPORT.md"))
-    args = ap.parse_args()
+SEED_IDS = {"book-001", "fail-002", "recover-003"}
 
+
+def build_report(syn_results, test_results, live: bool, mode_label: str):
+    """Run E1-E7 on given results. Returns (all_ok, markdown, rows) where rows = (id, name, gated, ok, detail)."""
     synthetic = load("synthetic_calls.json")
     sgd = {s: load(f"sgd_{s}.json") for s in ("train", "dev", "test")}
     utterance_words = set(json.loads((DATA / "sgd_utterance_vocab.json").read_text()))
-
     seed_calls = [c for c in synthetic if c["call_id"] in {"book-001", "fail-002", "recover-003"}]
-    (HERE / "results").mkdir(exist_ok=True)
-    if args.synthetic_results:
-        syn_results = json.loads(Path(args.synthetic_results).read_text())
-    else:
-        syn_results = run(synthetic, workers=8, quiet=True)
-        (HERE / "results" / "synthetic_mock.json").write_text(json.dumps(syn_results, indent=1))
-    if args.results:
-        test_results = json.loads(Path(args.results).read_text())
-    else:
-        test_results = run(sgd["test"], workers=8, quiet=True)
-        (HERE / "results" / "sgd_test_mock.json").write_text(json.dumps(test_results, indent=1))
     seed_results = [r for r in syn_results if r["call_id"] in {c["call_id"] for c in seed_calls}]
 
     all_calls = synthetic + sgd["train"] + sgd["dev"] + sgd["test"]
@@ -202,13 +187,13 @@ def main():
         ("E1", "Contract", True, e1_contract(syn_results + test_results)),
         ("E2", "No leak", True, e2_no_leak(all_calls, utterance_words)),
         ("E3", "Reducer fidelity", True, e3_reducer(all_calls)),
-        ("E4", "Seed trajectories", not args.live, e4_seed(seed_results)),
-        ("E5", "Signal on SGD test", not args.live, e5_signal(test_results, sgd["train"], sgd["test"], syn_results, synthetic)),
+        ("E4", "Seed trajectories", not live, e4_seed(seed_results)),
+        ("E5", "Signal on SGD test", not live, e5_signal(test_results, sgd["train"], sgd["test"], syn_results, synthetic)),
         ("E6", "Record -> replay", True, e6_record_replay(seed_calls)),
         ("E7", "Cost accounting", True, e7_cost(test_results, sgd["train"] + sgd["dev"] + sgd["test"])),
     ]
 
-    mode = "live" if args.live else "mock"
+    mode = "live" if live else "mock"
     lines = [f"# Eval report ({mode})", "", "| ID | Eval | Gate | Result | Detail |", "|---|---|---|---|---|"]
     all_ok = True
     for eid, name, gated, (ok, detail, problems) in evals:
@@ -226,7 +211,32 @@ def main():
     lines += ["", "## SGD test trajectories and review (evaluate.py)", "", "```", evaluate.render(test_results, max_calls=4), "```"]
     lines += ["", "## Seed trajectories (synthetic set summary at the bottom)", "", "```",
               evaluate.render(seed_results).split("\n\ncalls=")[0], "", evaluate.render(syn_results, max_calls=0), "```", ""]
-    lines.insert(1, f"\n**Overall: {'PASS' if all_ok else 'FAIL'}** (Jev mode: {jev_client.mode()})\n")
+    lines.insert(1, f"\n**Overall: {'PASS' if all_ok else 'FAIL'}** (Jev mode: {mode_label})\n")
+    rows = [(eid, name, gated, ok, detail) for eid, name, gated, (ok, detail, _) in evals]
+    return all_ok, "\n".join(lines), rows
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--results", help="SGD test results from simulate.py (default: simulate now)")
+    ap.add_argument("--synthetic-results", help="results for data/synthetic_calls.json (default: simulate now)")
+    ap.add_argument("--live", action="store_true", help="report E4/E5 instead of gating them")
+    ap.add_argument("--out", default=str(HERE / "evals" / "REPORT.md"))
+    args = ap.parse_args()
+
+    (HERE / "results").mkdir(exist_ok=True)
+    if args.synthetic_results:
+        syn_results = json.loads(Path(args.synthetic_results).read_text())
+    else:
+        syn_results = run(load("synthetic_calls.json"), workers=8, quiet=True)
+        (HERE / "results" / "synthetic_mock.json").write_text(json.dumps(syn_results, indent=1))
+    if args.results:
+        test_results = json.loads(Path(args.results).read_text())
+    else:
+        test_results = run(load("sgd_test.json"), workers=8, quiet=True)
+        (HERE / "results" / "sgd_test_mock.json").write_text(json.dumps(test_results, indent=1))
+    all_ok, md, _ = build_report(syn_results, test_results, live=args.live, mode_label=jev_client.mode())
+    lines = md.split("\n")
     Path(args.out).parent.mkdir(exist_ok=True)
     Path(args.out).write_text("\n".join(lines))
     print("\n".join(lines[:12]))

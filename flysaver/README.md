@@ -46,29 +46,38 @@ curl -fsSL https://raw.githubusercontent.com/smkalle/vibe1/main/flysaver/deploy.
 ```
 
 If `git`, `rust`, `socat` or `jq` are missing, it asks before installing them
-with pacman. It keeps its checkout in `~/.local/src/flysaver`. Re-run the same
-command to update.
+with pacman (pass `--yes` to skip the prompt). It keeps its checkout in
+`~/.local/src/flysaver` (`$FLYSAVER_SRC`), reset to the requested ref on every
+run, so re-run the same command to update. Needs Linux, runs as your own user
+(not root), and needs pacman for missing deps.
 
 Options go after `bash -s --`:
 
 | Option | Effect |
 |---|---|
-| `--now` | start the screensaver on every monitor right away |
-| `--test` | run the test suite first |
-| `--ref <branch/tag/sha>` | build a different version |
-| `--uninstall` | remove flysaver |
+| `--now` | start the screensaver on every monitor right away (skipped outside Hyprland) |
+| `--test` | run the test suite before installing |
+| `--ref <branch/tag/sha>` | build a different version (default `main`) |
+| `--yes` | don't ask before installing missing packages with pacman |
+| `--uninstall` | remove flysaver (keeps `flysaver.toml`, asks about deleting the checkout) |
+
+`FLYSAVER_REPO` and `FLYSAVER_SRC` override the git URL and checkout dir.
 
 For example: `curl -fsSL …/deploy.sh | bash -s -- --now`.
 
-To build from a checkout by hand instead:
+To build from a checkout by hand instead (same flags the deploy script uses):
 
 ```bash
-cd flysaver
-cargo build --release
+git clone https://github.com/smkalle/vibe1.git
+cd vibe1/flysaver
+cargo build --release --locked
 target/release/flysaver install
 ```
 
-Then log out and back in. To try it right away:
+After a first install, log out and back in so the Hyprland session picks up
+the new `PATH` (updates don't need this). The script also runs
+`flysaver doctor` afterwards (advisory: it never fails the deploy).
+To try it right away:
 
 ```bash
 flysaver launch     # every monitor, now
@@ -80,7 +89,7 @@ flysaver doctor     # check the setup
 
 | File | Purpose |
 |---|---|
-| `~/.local/bin/flysaver` | the binary: about 5 MB, static apart from libc, with the brain and connectome embedded |
+| `~/.local/bin/flysaver` | the binary: about 5 MB, only `libc` as a Cargo dependency, with the brain and connectome embedded |
 | `~/.local/share/flysaver/bin/omarchy-screensaver` | a shim that runs flysaver, or falls back to the stock screensaver |
 | `~/.config/uwsm/env.d/99-flysaver` | puts the shim first on the Hyprland session's `PATH` |
 | `~/.local/share/flysaver/flysaver-launch` | `flysaver launch`: Omarchy's launcher, pointed at flysaver |
@@ -97,7 +106,9 @@ first-class hook.
 
 - **Turn it off, keep it installed:** `touch ~/.config/omarchy/flysaver.disabled`
   (the shim then runs the stock screensaver).
-- **Remove it:** `flysaver uninstall`, then log out and back in.
+- **Remove it:** `flysaver uninstall`, then log out and back in. This keeps
+  `~/.config/omarchy/flysaver.toml` and the `~/.local/src/flysaver` checkout;
+  `deploy.sh --uninstall` additionally offers to delete the checkout.
 
 ## Settings
 
@@ -128,7 +139,7 @@ first-class hook.
 | `glitch` | `true` | the occasional stutter and jitter |
 | `hud` | `true` | title, status line, credits |
 
-The same options work as flags: `flysaver preview --camera brain --palette matrix`.
+The same options work as flags: `flysaver preview --camera brain --palette matrix --colors 256` (`brain`, `vivid`, `pilot`, `threats`, `eyes`, `learning` and `bitter` are config-file only).
 
 ### 256 colours
 
@@ -374,12 +385,15 @@ per frame. 256-colour mode writes about a third less, for a little more CPU.
 ## Tests
 
 ```bash
-cargo test --release                       # unit tests, golden frames, parity with the Cadence library
-python3 tests/pty_lifecycle.py             # exits and terminal restore in a real pty
-python3 tests/hypr_contract.py             # focus-loss exit, pointer, close-all, against a fake Hyprland
-tests/install_roundtrip.sh                 # install, shim, fallback, uninstall in a scratch $HOME
+cargo test --release --locked              # unit tests, golden frames, parity with the Cadence library
+python3 tests/pty_lifecycle.py target/release/flysaver             # exits and terminal restore in a real pty
+python3 tests/hypr_contract.py target/release/flysaver             # focus-loss exit, pointer, close-all, against a fake Hyprland
+tests/install_roundtrip.sh target/release/flysaver                 # install, shim, fallback, uninstall in a scratch $HOME
 NODE_PATH=$(npm root -g) node tools/shoot.cjs out.png < <(flysaver snapshot --html --camera brain)
 ```
+
+`deploy.sh --test` runs the first four. The binary argument defaults to
+`target/release/flysaver`, so it can be omitted.
 
 After an intentional visual change, regenerate the golden frames with
 `tests/golden/regen.sh`.

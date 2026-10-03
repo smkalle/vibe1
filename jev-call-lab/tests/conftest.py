@@ -13,6 +13,7 @@ def offline(monkeypatch, tmp_path):
     """Tests never touch the network: mock mode, no key, private fixtures dir."""
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setenv("JEV_MODE", "mock")
+    monkeypatch.setenv("LLM_MODE", "mock")
     monkeypatch.setenv("JEV_FIXTURES", str(tmp_path / "fixtures"))
 
 

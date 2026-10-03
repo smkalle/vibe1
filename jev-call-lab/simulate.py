@@ -2,10 +2,12 @@
 
     python simulate.py --data data/synthetic_calls.json --limit 3
     python simulate.py --data data/sgd_test.json --workers 16 --out results/sgd_test.json
+    python simulate.py --scorer glm --data data/sgd_test.json --limit 5 --out results/sgd_glm.json
 """
 import argparse
 import json
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from pathlib import Path
 
 from jev_client import decide, validate_response
@@ -38,11 +40,14 @@ def attempted_booking(events: list) -> bool:
     return any(e["event"] in BOOKING_INTENT for e in events[: decision_index(events)])
 
 
-def forecast_call(call: dict, review: bool = True, cfg=None) -> dict:
+def forecast_call(call: dict, review: bool = True, cfg=None, decide_fn=None, scorer: str = "jev") -> dict:
+    """Forecast one call. decide_fn(state, questions) defaults to Jev (or cfg); pass a partial for GLM."""
     events = call["events"]
     turns = []
+    if decide_fn is None:
+        decide_fn = partial(decide, cfg=cfg) if cfg is not None else decide
     for idx in forecast_points(events):
-        resp = decide(prefix_state(call, events[: idx + 1], idx), WILL_BOOK, cfg=cfg)
+        resp = decide_fn(prefix_state(call, events[: idx + 1], idx), WILL_BOOK)
         turns.append({
             "event_index": idx,
             "t_ms": events[idx]["t_ms"],
@@ -70,7 +75,7 @@ def forecast_call(call: dict, review: bool = True, cfg=None) -> dict:
     }
     if review:
         # All five questions share one state, so they share one request.
-        resp = decide(prefix_state(call, events, len(events) - 1), REVIEW, cfg=cfg)
+        resp = decide_fn(prefix_state(call, events, len(events) - 1), REVIEW)
         out.update(
             review=resp["answers"],
             review_errors=validate_response(REVIEW, resp),
@@ -80,15 +85,31 @@ def forecast_call(call: dict, review: bool = True, cfg=None) -> dict:
             cost_source=resp["_cost_source"],
             model=resp.get("model"),
         )
+    out["scorer"] = scorer
     return out
 
 
-def run(calls: list, workers: int = 8, review: bool = True, quiet: bool = False, cfg=None) -> list:
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        results = list(pool.map(lambda c: forecast_call(c, review, cfg), calls))
+def run(calls: list, workers: int = 8, review: bool = True, quiet: bool = False, cfg=None,
+        decide_fn=None, scorer: str = "jev", strict: bool = True) -> list:
+    """Run all calls. strict=False records per-call failures as {"call_id", "error"} instead of raising."""
+    if strict:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            results = list(pool.map(lambda c: forecast_call(c, review, cfg, decide_fn, scorer), calls))
+    else:
+        from concurrent.futures import as_completed
+        results = []
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futs = {pool.submit(forecast_call, c, review, cfg, decide_fn, scorer): c for c in calls}
+            for fut in as_completed(futs):
+                try:
+                    results.append(fut.result())
+                except Exception as e:  # noqa: BLE001 - recorded, run continues
+                    results.append({"call_id": futs[fut]["call_id"], "error": f"{type(e).__name__}: {e}"})
+        order = {c["call_id"]: i for i, c in enumerate(calls)}
+        results.sort(key=lambda r: order[r["call_id"]])
     if not quiet:
         for r in results:
-            print("done", r["call_id"])
+            print("done", r["call_id"], r.get("error", ""))
     return results
 
 
@@ -99,9 +120,22 @@ def main():
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--limit", type=int)
     ap.add_argument("--no-review", action="store_true")
+    ap.add_argument("--scorer", choices=["jev", "glm"], default="jev")
+    ap.add_argument("--llm-model", default=None, help="GLM model slug (default: LLM_MODEL or z-ai/glm-5.3)")
+    ap.add_argument("--keep-going", action="store_true",
+                    help="record per-call failures as {call_id, error} instead of aborting the run")
     a = ap.parse_args()
     calls = json.loads(Path(a.data).read_text())[: a.limit]
-    results = run(calls, a.workers, review=not a.no_review, quiet=len(calls) > 20)
+    decide_fn, scorer = None, a.scorer
+    if a.scorer == "glm":
+        import llm_client
+        llm_cfg = llm_client.config_from_env()
+        if a.llm_model:
+            llm_cfg = llm_client.Config(mode=llm_cfg.mode, api_key=llm_cfg.api_key, url=llm_cfg.url,
+                                        model=a.llm_model, effort=llm_cfg.effort, fixtures=llm_cfg.fixtures)
+        decide_fn = partial(llm_client.decide, cfg=llm_cfg)
+    results = run(calls, a.workers, review=not a.no_review, quiet=len(calls) > 20,
+                  decide_fn=decide_fn, scorer=scorer, strict=not a.keep_going)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(json.dumps(results, indent=1))
     print(f"{len(results)} calls, {sum(len(r['turns']) for r in results)} turn forecasts -> {a.out}")

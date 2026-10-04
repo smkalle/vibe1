@@ -19,9 +19,14 @@ Regenerate them with `python generate_synthetic.py` and `python reduce_sgd.py --
 ## Workbench UI (v2: guided benchmark workflow)
 
 ```bash
-pip install -r requirements.txt
-streamlit run app.py
+./run.sh          # creates .venv, installs deps, opens http://localhost:8501
+./run.sh check    # offline tests + evals E1-E7 instead
 ```
+
+`run.sh` uses a venv because Arch-based systems (e.g. Omarchy) block system-wide pip. Manual equivalent:
+`python -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/streamlit run app.py`.
+Start in **replay** mode (the default) for real recorded Jev and GLM answers with no key and no spend. Paste an OpenRouter
+key in step ① only for live, record or the latency probe.
 
 Spec: [`../specs/jev-workbench-v2.md`](../specs/jev-workbench-v2.md). Two views share one app:
 

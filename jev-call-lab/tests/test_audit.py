@@ -65,3 +65,10 @@ def test_audit_run_end_to_end(seed_calls):
     assert rep["contract"]["ok"] and rep["no_leak"]["ok"]
     assert rep["duplicates"]["n_groups"] == 0 and rep["hygiene"] == []
     assert rep["metrics"]["n_calls"] == 3
+
+
+def test_scan_reads_jsonl_and_finds_keys_in_it(tmp_path):
+    p = tmp_path / "results.jsonl"
+    p.write_text('{"call_id": "a"}\n{"note": "sk-or-v1-' + "b" * 64 + '"}\n')
+    hits = audit.scan_artifact_files([p])
+    assert len(hits) == 1 and "unreadable" not in hits[0]

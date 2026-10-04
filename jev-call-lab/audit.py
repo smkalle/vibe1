@@ -60,7 +60,10 @@ def scan_artifact_files(paths, max_findings=20):
     hits = []
     for p in paths:
         try:
-            obj = json.loads(Path(p).read_text())
+            text = Path(p).read_text()
+            # Workspace runs are JSON Lines (one result per call); everything else is one JSON document.
+            obj = [json.loads(line) for line in text.splitlines() if line.strip()] if str(p).endswith(".jsonl") \
+                else json.loads(text)
         except (OSError, ValueError) as e:  # unreadable files are reported, not fatal
             hits.append(f"{p}: <unreadable: {e}>")
             continue

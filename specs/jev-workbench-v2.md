@@ -1,6 +1,6 @@
 # Spec: Jev workbench v2, an operator workflow for benchmarking call-analysis approaches
 
-**Status:** SPEC, awaiting the user's answers to §14 and sign-off (§15). Nothing is built yet.
+**Status:** APPROVED with defaults (§14). P1 in progress.
 **Builds on:** [jev-call-analysis.md](jev-call-analysis.md) (v1 lab, evals E1–E7) and main @ `d93ce7c`
 (three-way benchmark Jev vs rules vs GLM-5.3, PR #12 latency provenance).
 **Lives in:** `jev-call-lab/` (still standalone; Streamlit stays the UI).
@@ -306,19 +306,19 @@ E1–E7 from v1 stay and now run per approach (R8).
 | **P3: operations** | background jobs with pause/resume/cap, latency probe, repeatability, cascade simulation, volume cost projection, export and fixture packs | W9–W11 |
 | **P4: extensions** | opt-in LLM reducer, robustness checks, a "text-aware" approach (GLM on redacted transcript) clearly separated from structure-only | new evals |
 
-## 14. Open questions (defaults I'd use if you don't override)
+## 14. Decisions (user accepted all defaults, 2026-10-04)
 
 1. **In-call latency budget:** default **800 ms p95 per decision**. What's the real budget for your receptionist?
 2. **Sending transcript text to GLM** (LLM reducer, text-aware approach): default **off**, opt-in per corpus after redaction. Is that acceptable for your data?
 3. **Deployment:** default a **local single-user** app with an on-disk workspace. Shared deployment with auth would be a separate spec.
 4. **Volume for cost projection:** default **10,000 calls/month**.
-5. **First real corpus to target:** your own call logs, or a public one (the Kaggle booking-calls set is blocked in this sandbox)?
+5. **First real corpus to target:** P1 uses the built-in corpora; your own call logs arrive with upload in P2 (the Kaggle booking-calls set is blocked in this sandbox).
 6. **Fixture cleanup:** OK to move the 10.5k committed fixture files into per-run compressed packs in P3?
 
 ## 15. Sign-off checklist
 
-- [ ] User: review the findings (§2) and approve the workflow (§4–§5)
-- [ ] User: answer or accept the defaults in §14
+- [x] User: review the findings (§2) and approve the workflow (§4–§5)
+- [x] User: answer or accept the defaults in §14
 - [ ] Build P1 → W1–W5, W8, W12, W13 pass; E1–E7 still pass
 - [ ] Build P2 → W6, W7 on an uploaded sample corpus
 - [ ] Build P3 → W9–W11; a live benchmark with both approaches on one frozen sample; the report exported

@@ -94,12 +94,12 @@ def forest(sc: dict, metric: str, best: str):
     for key, (mean, lo, hi) in sc["diffs"].get(metric, {}).items():
         a, b = key.split("|")
         if b == best and mean is not None:
-            rows.append({"approach": a, "label": sc["approaches"][a]["label"] + " − " + sc["approaches"][best]["label"],
+            rows.append({"approach": a, "label": sc["approaches"][a]["label"],
                          "mean": mean, "lo": lo, "hi": hi})
     if not rows:
         return None
     df = pd.DataFrame(rows)
-    y = alt.Y("label:N", title=None)
+    y = alt.Y("label:N", title=None, axis=alt.Axis(labelLimit=260))
     zero = alt.Chart(pd.DataFrame({"z": [0]})).mark_rule(color=GRID_GRAY, strokeDash=[4, 4]).encode(x="z:Q")
     ci = alt.Chart(df).mark_rule(strokeWidth=2).encode(x=alt.X("lo:Q", title="Paired difference (95% CI)"), x2="hi:Q", y=y,
                                                        color=alt.Color("approach:N", scale=_color(df["approach"]), legend=None))
@@ -107,7 +107,7 @@ def forest(sc: dict, metric: str, best: str):
         x="mean:Q", y=y, color=alt.Color("approach:N", scale=_color(df["approach"]), legend=None),
         tooltip=["label:N", alt.Tooltip("mean:Q", format="+.3f"), alt.Tooltip("lo:Q", format="+.3f"),
                  alt.Tooltip("hi:Q", format="+.3f")])
-    return alt.layer(zero, ci, pt).properties(height=max(90, 40 * len(rows)))
+    return alt.layer(zero, ci, pt).properties(height=max(110, 56 * len(rows)))
 
 
 def trajectory_overlay(per_approach: dict, labels: dict):

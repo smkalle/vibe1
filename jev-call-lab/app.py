@@ -83,14 +83,20 @@ def project() -> workspace.Project:
 
 
 def current_sample():
+    """The selected sample, else the latest frozen sample for this corpus (so a refresh never loses the plan)."""
     sid = ss.get("sample_id")
-    if not sid:
-        return None
-    try:
-        s = project().sample(sid)
-    except FileNotFoundError:
-        return None
-    return s if s["corpus_id"] == ss.corpus_id else None
+    if sid:
+        try:
+            s = project().sample(sid)
+            if s["corpus_id"] == ss.corpus_id:
+                return s
+        except FileNotFoundError:
+            pass
+    mine = [s for s in project().samples() if s["corpus_id"] == ss.corpus_id]
+    if mine:
+        ss.sample_id = mine[-1]["sample_id"]
+        return mine[-1]
+    return None
 
 
 @st.cache_data(show_spinner=False)

@@ -1,6 +1,6 @@
 # Spec: Jev workbench v2, an operator workflow for benchmarking call-analysis approaches
 
-**Status:** APPROVED with defaults (§14). P1 in progress.
+**Status:** APPROVED with defaults (§14). **P1 BUILT** (2026-10-04, §16). P2–P4 not started.
 **Builds on:** [jev-call-analysis.md](jev-call-analysis.md) (v1 lab, evals E1–E7) and main @ `d93ce7c`
 (three-way benchmark Jev vs rules vs GLM-5.3, PR #12 latency provenance).
 **Lives in:** `jev-call-lab/` (still standalone; Streamlit stays the UI).
@@ -319,6 +319,39 @@ E1–E7 from v1 stay and now run per approach (R8).
 
 - [x] User: review the findings (§2) and approve the workflow (§4–§5)
 - [x] User: answer or accept the defaults in §14
-- [ ] Build P1 → W1–W5, W8, W12, W13 pass; E1–E7 still pass
+- [x] Build P1 → W1–W5, W8, W12, W13 pass; E1–E7 still pass
 - [ ] Build P2 → W6, W7 on an uploaded sample corpus
 - [ ] Build P3 → W9–W11; a live benchmark with both approaches on one frozen sample; the report exported
+
+## 16. P1 results (2026-10-04)
+
+**Built:** `sampling.py`, `stats.py`, `workspace.py`, `benchmark.py`, `ui_charts.py`, `ui_tools.py`, and a rewritten `app.py`.
+Fixes R1–R8 as specified. R9 (per-(call, turn) fixture keys) stays in P3 with fixture packs.
+
+**Evals:** 78 tests pass (offline); E1–E7 PASS. W1 pairing, W2 stale state (engine and UI), W3 sampling, W4 bootstrap
+coverage (≥ 90% over 120 simulated trials, B=300), W5 verdict table, W8 latency provenance (mock and probe),
+W12 full mock workflow through AppTest, W13 import provenance. Also tested: resume after failures with no duplicates,
+the cost-cap pause, and no key anywhere in the workspace after a live (local mock server) run.
+
+**Real data (replay of the committed live recordings, 0 misses):**
+
+| Corpus (sample) | Use case | Verdict | Why |
+|---|---|---|---|
+| Synthetic (153) | In-call escalation | Rule: furthest stage | GLM 0.815, Jev 0.799, rule 0.773 before the outcome: a tie within CIs, so the free option wins. Jev/GLM latency not yet measured. |
+| Synthetic (153) | Post-call QA | **GLM-5.3** | Beats Jev on failure-mode F1 by +0.15 (95% CI +0.11 to +0.20). $3.23 vs $0.27 per 1k calls. |
+| Synthetic (153) | Bulk analytics | Rule: furthest stage | Beats GLM mid-call by +0.12 (CI +0.05 to +0.18). |
+| SGD test (167) | In-call escalation | Rule: furthest stage | 0.965 vs Jev 0.755 and GLM 0.650. The outcome is visible from structure. |
+| SGD test (167) | Post-call QA | Jev (low confidence) | Ties GLM (F1 0.575 vs 0.604, CI overlaps); cheaper ($0.53 vs $5.54 per 1k). |
+
+**Found and fixed while building:**
+- E6 had been failing on main since #12. Replay tags latency as `recorded` and record as `measured`, and E6 compared them.
+  It now ignores latency metadata, and `run_evals.py` prints the whole table (it printed only through E5, which hid this).
+- The audit's secret scan couldn't read `.jsonl` (it reported "unreadable"). It reads JSON Lines now.
+- The cost estimates were off. GLM was about 3.6× high (worst-case completion tokens) and Jev about 2.2× low (chars/4).
+  The UI now shows an expected cost calibrated on live usage, plus a worst case used for caps and confirmation.
+- UI: dollar signs rendered as LaTeX; chart labels collided; the logistic-regression rule silently vanished
+  when the sample was the whole corpus (now explained, and the default sample leaves 20% for training);
+  the plan was lost on refresh (the latest frozen sample is now restored).
+
+**Open for the user:** a live latency probe for Jev and GLM (the committed recordings carry no timings), so the
+in-call verdict can weigh real latency against the 800 ms budget.

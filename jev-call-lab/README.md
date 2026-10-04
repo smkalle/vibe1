@@ -7,6 +7,27 @@ questions: "will this call book?" after every agent turn, plus a five-question r
 Spec, decisions and results: [`../specs/jev-call-analysis.md`](../specs/jev-call-analysis.md).
 Latest eval report: [`evals/REPORT.md`](evals/REPORT.md).
 
+## Quick start
+
+```bash
+cd jev-call-lab
+./run.sh          # workbench at http://localhost:8501 (replay: real recorded answers, free)
+./run.sh check    # offline tests + evals E1-E7, no network
+```
+
+No key needed to explore: replay serves the committed live recordings. To run live,
+export `OPENROUTER_API_KEY`, smoke-test both scorers, then benchmark:
+
+```bash
+export OPENROUTER_API_KEY=sk-or-v1-...
+python jev_client.py --smoke     # Jev: URL, model, answer shape
+python llm_client.py --smoke     # GLM-5.3: same key, chat completions
+python benchmark.py --project demo --corpus synthetic --n 60 --approaches rules_b1,rules_b2,jev,glm
+```
+
+The CLI produces the same paired scorecard as the workbench Compare step: every approach
+scores one frozen, stratified sample, with 95% CIs and a verdict per use case.
+
 ## Data
 
 | File | What | Calls |
@@ -83,6 +104,15 @@ python run_evals.py --live --results results/sgd_test_live.json --synthetic-resu
 offline for free, and commit the fixtures if you want the run to be reproducible.
 Projected cost of the full SGD set (8,476 requests, about 5M input tokens): about **$0.21**.
 
+Replay the same way for GLM (`LLM_MODE=replay`; fixtures are `glm_`-prefixed, so the two
+scorers never collide). For a paired three-way comparison on one frozen sample, prefer the
+workbench Plan step or `benchmark.py` (above) over raw `simulate.py`: first-N slices of
+`sgd_test.json` are single-class (all unbooked), which leaves AUC undefined.
+
+Measured live cost per call (500-call mixed sample): Jev ~$0.0006, GLM-5.3 ~$0.006
+(reasoning tokens dominate). Keep benchmark samples small; every paid action in the UI
+shows an estimate and enforces a cap.
+
 GLM scorer (`llm_client.py`, default `z-ai/glm-5.3` on the same key): answers the same typed
 questions through OpenRouter chat completions with JSON repair retries, so Jev wire shape,
 contract checks and evaluators work unchanged. Reasoning is always on (effort `low` by default);
@@ -91,21 +121,37 @@ to never collide with Jev's. CLI: `simulate.py --scorer glm [--llm-model ...]`; 
 `python llm_client.py --smoke`. The workbench **Compare** step scores Jev vs rules vs GLM on
 the same frozen sample (paired AUCs with CIs + latency probe + $/call, verdict rule).
 
-If the smoke test returns 404: `export JEV_URL=https://openrouter.ai/api/v1/systemone JEV_MODEL=jev-1.13`.
-
 | Env | Default | |
 |---|---|---|
 | `JEV_MODE` | `auto` | `live` if a key is set, else `mock`; also `record`, `replay` |
+| `LLM_MODE` | `auto` | same, for the GLM scorer (`record`/`replay` use `glm_`-prefixed fixtures) |
 | `JEV_URL` | `https://openrouter.ai/api/alpha/decisions` | |
 | `JEV_MODEL` | `typesafe/jev-1.13` | |
+| `LLM_MODEL` | `z-ai/glm-5.3` | override with `--llm-model` |
+| `LLM_EFFORT` | `low` | GLM reasoning effort (`low`/`high`/`max`) |
 | `JEV_FIXTURES` | `./fixtures` | record/replay directory |
 
 ## Files
 
 `jev_client.py` client, retries, record/replay, contract validator · `mock_jev.py` heuristic stand-in and HTTP server ·
 `questions.py` `WILL_BOOK`, `REVIEW`, `prefix_state` · `schema.py` closed vocabulary and call validator ·
-`generate_synthetic.py` · `reduce_sgd.py` · `simulate.py` forecasts and reviews · `evaluate.py` metrics and trajectories ·
-`baselines.py` constant / stage-reached / logistic-regression baselines · `run_evals.py` E1-E7.
+`generate_synthetic.py` · `reduce_sgd.py` · `simulate.py` forecasts and reviews (`--scorer jev|glm`, `--keep-going`) ·
+`evaluate.py` metrics and trajectories ·
+`baselines.py` constant / stage-reached / logistic-regression baselines · `run_evals.py` E1-E7 ·
+`llm_client.py` GLM chat scorer (same wire shape, `LLM_MODE`) · `audit.py` per-run contract / leak / replay-risk / hygiene checks ·
+`benchmark.py` paired engine (validation, capped resumable runs, latency probe, scorecard, verdict) ·
+`sampling.py` frozen stratified samples · `stats.py` cluster bootstrap, ECE, F1 · `workspace.py` on-disk projects/runs/manifests ·
+`ui_charts.py`, `ui_tools.py` shared workbench widgets.
+
+## Troubleshooting
+
+- Smoke test returns 404: `export JEV_URL=https://openrouter.ai/api/v1/systemone JEV_MODEL=jev-1.13`.
+- `ImportError` (e.g. `REAL_LATENCY`) after `git pull`: restart the Streamlit server. Long-running
+  servers keep already-imported modules cached and mix new scripts with stale ones.
+- Blank AUC cells on small samples: the sample holds one class only. Use the Plan step's frozen
+  stratified sample (never first-N) instead of raw `--limit`.
+- GLM reply failures at scale (`type None != 'noul'`): handled since `llm_client.to_wire` backfills
+  the missing discriminator; `--keep-going` records per-call failures instead of aborting long runs.
 
 ## Differences from the tutorial
 

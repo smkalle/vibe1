@@ -1,0 +1,59 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "north-clinic",
+   "specialty": "dermatology",
+   "forecast_after_event_index": 1,
+   "elapsed_ms": 4146,
+   "current_stage": "identity",
+   "current_event": "asked_dob_and_name",
+   "fail_count_so_far": 0,
+   "tool_calls_so_far": 0,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 4146,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "asked_dob_and_name",
+     "ok": true
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.43
+   }
+  },
+  "usage": {
+   "input_tokens": 553,
+   "output_tokens": 21,
+   "cost": 2.3226e-05
+  },
+  "id": "gen-dec-1790964755-n23Z4OBa4HzPWaAkLxPY",
+  "provider": "TypeSafe"
+ }
+}

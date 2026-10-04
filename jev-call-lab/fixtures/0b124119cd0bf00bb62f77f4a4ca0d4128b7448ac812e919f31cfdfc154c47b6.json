@@ -1,0 +1,103 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "west-clinic",
+   "specialty": "dermatology",
+   "forecast_after_event_index": 7,
+   "elapsed_ms": 29038,
+   "current_stage": "handoff",
+   "current_event": "offered_human_transfer",
+   "fail_count_so_far": 3,
+   "tool_calls_so_far": 2,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 3741,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "asked_dob_and_name",
+     "ok": true
+    },
+    {
+     "t_ms": 7679,
+     "actor": "caller",
+     "stage": "identity",
+     "event": "provided_identifiers",
+     "ok": true
+    },
+    {
+     "t_ms": 11685,
+     "actor": "tool",
+     "stage": "identity",
+     "event": "ehr_patient_lookup",
+     "ok": false,
+     "tool": "find_patient"
+    },
+    {
+     "t_ms": 13685,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "identity_check_failed",
+     "ok": false
+    },
+    {
+     "t_ms": 19495,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "retried_with_phone_match",
+     "ok": true
+    },
+    {
+     "t_ms": 24876,
+     "actor": "tool",
+     "stage": "identity",
+     "event": "ehr_patient_lookup",
+     "ok": false,
+     "tool": "find_patient"
+    },
+    {
+     "t_ms": 29038,
+     "actor": "agent",
+     "stage": "handoff",
+     "event": "offered_human_transfer",
+     "ok": true
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.07
+   }
+  },
+  "usage": {
+   "input_tokens": 847,
+   "output_tokens": 21,
+   "cost": 3.5574e-05
+  },
+  "id": "gen-dec-1790964738-0vVhmkatj3CAVNFue3px",
+  "provider": "TypeSafe"
+ }
+}

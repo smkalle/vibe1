@@ -1,0 +1,253 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "Services_1",
+   "specialty": "salon",
+   "forecast_after_event_index": 15,
+   "elapsed_ms": 39340,
+   "current_stage": "complete",
+   "current_event": "call_ended",
+   "fail_count_so_far": 1,
+   "tool_calls_so_far": 1,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 400,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "is_unisex",
+      "city"
+     ]
+    },
+    {
+     "t_ms": 450,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "stated_intent_find",
+     "ok": true
+    },
+    {
+     "t_ms": 4500,
+     "actor": "tool",
+     "stage": "discovery",
+     "event": "search_providers",
+     "ok": true,
+     "tool": "find_provider",
+     "n_results": 10
+    },
+    {
+     "t_ms": 6050,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_provider",
+     "ok": true,
+     "slots": [
+      "stylist_name",
+      "city"
+     ]
+    },
+    {
+     "t_ms": 6100,
+     "actor": "agent",
+     "stage": "discovery",
+     "event": "gave_result_count",
+     "ok": true
+    },
+    {
+     "t_ms": 10200,
+     "actor": "caller",
+     "stage": "info",
+     "event": "asked_info",
+     "ok": true,
+     "slots": [
+      "street_address",
+      "average_rating"
+     ]
+    },
+    {
+     "t_ms": 14300,
+     "actor": "agent",
+     "stage": "info",
+     "event": "gave_info",
+     "ok": true,
+     "slots": [
+      "average_rating",
+      "street_address"
+     ]
+    },
+    {
+     "t_ms": 19680,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "selected_offer",
+     "ok": true
+    },
+    {
+     "t_ms": 21860,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_to_book",
+     "ok": true
+    },
+    {
+     "t_ms": 25000,
+     "actor": "caller",
+     "stage": "wrapup",
+     "event": "declined_booking_offer",
+     "ok": false
+    },
+    {
+     "t_ms": 28780,
+     "actor": "agent",
+     "stage": "wrapup",
+     "event": "asked_anything_else",
+     "ok": true
+    },
+    {
+     "t_ms": 32560,
+     "actor": "caller",
+     "stage": "wrapup",
+     "event": "nothing_else",
+     "ok": true
+    },
+    {
+     "t_ms": 32610,
+     "actor": "caller",
+     "stage": "wrapup",
+     "event": "thanked",
+     "ok": true
+    },
+    {
+     "t_ms": 36020,
+     "actor": "agent",
+     "stage": "wrapup",
+     "event": "said_goodbye",
+     "ok": true
+    },
+    {
+     "t_ms": 39340,
+     "actor": "system",
+     "stage": "complete",
+     "event": "call_ended",
+     "ok": true
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   },
+   "failure_mode": {
+    "type": "choice",
+    "instructions": "What is the dominant failure or success mode visible in the structure?",
+    "criteria": {
+     "clean_book": "Lookup, offer and booking all succeeded with little friction.",
+     "recovered_error": "An earlier tool, identity or booking failure was later overcome and the call booked.",
+     "identity_block": "Patient lookup or verification never succeeded.",
+     "no_availability": "Slot search or booking kept failing and the call stalled there.",
+     "info_only": "The caller only gathered information and never tried to book.",
+     "declined_offer": "The caller was offered a booking or slot and turned it down.",
+     "caller_drop": "Long silence, refusal, or hangup ended the call.",
+     "agent_loop": "Repeated stages or tools without forward progress.",
+     "other": "None of the above fits."
+    }
+   },
+   "agent_progress": {
+    "type": "score",
+    "instructions": "How far did the agent advance the scheduling workflow?",
+    "criteria": [
+     "Never got past greeting or identity",
+     "Reached intent or search but made no real offer",
+     "Offered a provider or slot but did not book",
+     "Completed a confirmed booking"
+    ]
+   },
+   "needs_human": {
+    "type": "noul",
+    "instructions": "Should a human receptionist have taken over, based on structure alone?",
+    "criteria": {
+     "true": "Stuck identity, refusal or silence, or repeated tool failure.",
+     "false": "The agent was still making workflow progress."
+    }
+   },
+   "visible_error_overweight": {
+    "type": "noul",
+    "instructions": "Does the trace contain an early visible error that a competent agent often recovers from (a failed lookup then retry, one failed booking then another slot)?"
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.05
+   },
+   "failure_mode": {
+    "type": "choice",
+    "choice": "declined_offer",
+    "probabilities": {
+     "recovered_error": 0,
+     "no_availability": 0,
+     "other": 0,
+     "agent_loop": 0,
+     "identity_block": 0,
+     "info_only": 0,
+     "caller_drop": 0,
+     "declined_offer": 1,
+     "clean_book": 0
+    },
+    "confidence": 1
+   },
+   "agent_progress": {
+    "type": "score",
+    "score": 2,
+    "legend": {
+     "0": "Never got past greeting or identity",
+     "1": "Reached intent or search but made no real offer",
+     "2": "Offered a provider or slot but did not book",
+     "3": "Completed a confirmed booking"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0,
+     "2": 1,
+     "3": 0
+    },
+    "confidence": 1
+   },
+   "needs_human": {
+    "type": "noul",
+    "noul": 0.26
+   },
+   "visible_error_overweight": {
+    "type": "noul",
+    "noul": 0.29
+   }
+  },
+  "usage": {
+   "input_tokens": 1685,
+   "output_tokens": 169,
+   "cost": 7.077e-05
+  },
+  "id": "gen-dec-1790964713-zsAIY20uTUWr6aWUwGgW",
+  "provider": "TypeSafe"
+ }
+}

@@ -108,6 +108,23 @@ def _post(payload: dict, timeout: float, cfg: Config) -> dict:
     raise AssertionError("unreachable")
 
 
+REAL_LATENCY = {"measured", "recorded"}
+
+
+def latency_of(mode_name: str, elapsed_ms: float, recorded_ms) -> tuple:
+    """Latency to report, and where it came from.
+
+    Only 'measured' (a live call) and 'recorded' (a live call's time saved in its fixture) are
+    network latency. Mock answers and replays of older fixtures without a saved time only
+    measure a local function call or file read, and must never be compared with real calls.
+    """
+    if mode_name in {"live", "record"}:
+        return elapsed_ms, "measured"
+    if mode_name == "replay" and isinstance(recorded_ms, (int, float)):
+        return float(recorded_ms), "recorded"
+    return elapsed_ms, "replay_local" if mode_name == "replay" else "mock"
+
+
 def decide(state: Any, questions: dict, timeout: float = 30.0, cfg: Config | None = None) -> dict:
     """One request: every question here is about the same state. cfg defaults to the environment."""
     cfg = cfg or config_from_env()
@@ -116,25 +133,29 @@ def decide(state: Any, questions: dict, timeout: float = 30.0, cfg: Config | Non
     fixture = cfg.fixtures / f"{cache_key(payload['model'], state, questions)}.json"
 
     t0 = time.perf_counter()
+    recorded_ms = None
     if m == "mock":
         body = mock_jev.answer(payload)
     elif m == "replay":
         if not fixture.exists():
             raise JevError(f"replay miss: no fixture {fixture.name} (record it first with JEV_MODE=record)")
-        body = json.loads(fixture.read_text())["response"]
+        saved = json.loads(fixture.read_text())
+        body, recorded_ms = saved["response"], saved.get("latency_ms")
     else:
         body = _post(payload, timeout, cfg)
         if m == "record":
             fixture.parent.mkdir(parents=True, exist_ok=True)
-            fixture.write_text(json.dumps({"request": payload, "response": body}, indent=1))
-    latency_ms = (time.perf_counter() - t0) * 1000
+            fixture.write_text(json.dumps({"request": payload, "response": body,
+                                           "latency_ms": (time.perf_counter() - t0) * 1000}, indent=1))
+    latency_ms, latency_source = latency_of(m, (time.perf_counter() - t0) * 1000, recorded_ms)
 
     usage = body.get("usage") or {}
     if isinstance(usage.get("cost"), (int, float)):
         cost, source = float(usage["cost"]), "usage.cost"
     else:
         cost, source = (usage.get("input_tokens") or 0) * PRICE_PER_INPUT_TOKEN, "tokens_x_price"
-    return {**body, "_latency_ms": latency_ms, "_cost_usd": cost, "_cost_source": source, "_mode": m}
+    return {**body, "_latency_ms": latency_ms, "_latency_source": latency_source,
+            "_cost_usd": cost, "_cost_source": source, "_mode": m}
 
 
 def _prob(x) -> bool:

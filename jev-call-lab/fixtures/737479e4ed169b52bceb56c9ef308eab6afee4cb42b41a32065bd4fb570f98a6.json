@@ -1,0 +1,204 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "west-clinic",
+   "specialty": "dermatology",
+   "forecast_after_event_index": 10,
+   "elapsed_ms": 31539,
+   "current_stage": "complete",
+   "current_event": "call_ended",
+   "fail_count_so_far": 0,
+   "tool_calls_so_far": 3,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 2860,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "asked_dob_and_name",
+     "ok": true
+    },
+    {
+     "t_ms": 5114,
+     "actor": "caller",
+     "stage": "identity",
+     "event": "provided_identifiers",
+     "ok": true
+    },
+    {
+     "t_ms": 9466,
+     "actor": "tool",
+     "stage": "identity",
+     "event": "ehr_patient_lookup",
+     "ok": true,
+     "tool": "find_patient"
+    },
+    {
+     "t_ms": 11981,
+     "actor": "agent",
+     "stage": "intent",
+     "event": "confirmed_follow_up",
+     "ok": true
+    },
+    {
+     "t_ms": 14360,
+     "actor": "tool",
+     "stage": "availability",
+     "event": "searched_open_slots",
+     "ok": true,
+     "tool": "search_slots",
+     "n_results": 2
+    },
+    {
+     "t_ms": 17470,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_two_slots",
+     "ok": true
+    },
+    {
+     "t_ms": 22115,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "accepted_slot",
+     "ok": true
+    },
+    {
+     "t_ms": 28022,
+     "actor": "tool",
+     "stage": "booking",
+     "event": "create_appointment",
+     "ok": true,
+     "tool": "book"
+    },
+    {
+     "t_ms": 31300,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_datetime",
+     "ok": true
+    },
+    {
+     "t_ms": 31539,
+     "actor": "system",
+     "stage": "complete",
+     "event": "call_ended",
+     "ok": true
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   },
+   "failure_mode": {
+    "type": "choice",
+    "instructions": "What is the dominant failure or success mode visible in the structure?",
+    "criteria": {
+     "clean_book": "Lookup, offer and booking all succeeded with little friction.",
+     "recovered_error": "An earlier tool, identity or booking failure was later overcome and the call booked.",
+     "identity_block": "Patient lookup or verification never succeeded.",
+     "no_availability": "Slot search or booking kept failing and the call stalled there.",
+     "info_only": "The caller only gathered information and never tried to book.",
+     "declined_offer": "The caller was offered a booking or slot and turned it down.",
+     "caller_drop": "Long silence, refusal, or hangup ended the call.",
+     "agent_loop": "Repeated stages or tools without forward progress.",
+     "other": "None of the above fits."
+    }
+   },
+   "agent_progress": {
+    "type": "score",
+    "instructions": "How far did the agent advance the scheduling workflow?",
+    "criteria": [
+     "Never got past greeting or identity",
+     "Reached intent or search but made no real offer",
+     "Offered a provider or slot but did not book",
+     "Completed a confirmed booking"
+    ]
+   },
+   "needs_human": {
+    "type": "noul",
+    "instructions": "Should a human receptionist have taken over, based on structure alone?",
+    "criteria": {
+     "true": "Stuck identity, refusal or silence, or repeated tool failure.",
+     "false": "The agent was still making workflow progress."
+    }
+   },
+   "visible_error_overweight": {
+    "type": "noul",
+    "instructions": "Does the trace contain an early visible error that a competent agent often recovers from (a failed lookup then retry, one failed booking then another slot)?"
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.96
+   },
+   "failure_mode": {
+    "type": "choice",
+    "choice": "clean_book",
+    "probabilities": {
+     "no_availability": 0,
+     "declined_offer": 0,
+     "agent_loop": 0,
+     "clean_book": 1,
+     "recovered_error": 0,
+     "caller_drop": 0,
+     "other": 0,
+     "info_only": 0,
+     "identity_block": 0
+    },
+    "confidence": 1
+   },
+   "agent_progress": {
+    "type": "score",
+    "score": 3,
+    "legend": {
+     "0": "Never got past greeting or identity",
+     "1": "Reached intent or search but made no real offer",
+     "2": "Offered a provider or slot but did not book",
+     "3": "Completed a confirmed booking"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0,
+     "2": 0,
+     "3": 1
+    },
+    "confidence": 1
+   },
+   "needs_human": {
+    "type": "noul",
+    "noul": 0.03
+   },
+   "visible_error_overweight": {
+    "type": "noul",
+    "noul": 0.03
+   }
+  },
+  "usage": {
+   "input_tokens": 1401,
+   "output_tokens": 168,
+   "cost": 5.8842e-05
+  },
+  "id": "gen-dec-1790964739-nUF7adpFaCk9eZn0cofr",
+  "provider": "TypeSafe"
+ }
+}

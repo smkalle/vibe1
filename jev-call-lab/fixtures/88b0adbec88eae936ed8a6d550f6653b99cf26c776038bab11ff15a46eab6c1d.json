@@ -1,0 +1,73 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "east-clinic",
+   "specialty": "family_medicine",
+   "forecast_after_event_index": 3,
+   "elapsed_ms": 17583,
+   "current_stage": "identity",
+   "current_event": "repeated_identity_ask",
+   "fail_count_so_far": 1,
+   "tool_calls_so_far": 0,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 3011,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "asked_dob_and_name",
+     "ok": true
+    },
+    {
+     "t_ms": 12697,
+     "actor": "caller",
+     "stage": "identity",
+     "event": "caller_went_silent",
+     "ok": false
+    },
+    {
+     "t_ms": 17583,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "repeated_identity_ask",
+     "ok": true
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.14
+   }
+  },
+  "usage": {
+   "input_tokens": 650,
+   "output_tokens": 21,
+   "cost": 2.73e-05
+  },
+  "id": "gen-dec-1790964736-ivCObzi2gStLCI5yllYh",
+  "provider": "TypeSafe"
+ }
+}

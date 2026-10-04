@@ -1,0 +1,194 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "west-clinic",
+   "specialty": "pediatrics",
+   "forecast_after_event_index": 9,
+   "elapsed_ms": 36396,
+   "current_stage": "complete",
+   "current_event": "call_ended",
+   "fail_count_so_far": 1,
+   "tool_calls_so_far": 1,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 5385,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "asked_dob_and_name",
+     "ok": true
+    },
+    {
+     "t_ms": 11224,
+     "actor": "caller",
+     "stage": "identity",
+     "event": "provided_identifiers",
+     "ok": true
+    },
+    {
+     "t_ms": 15471,
+     "actor": "tool",
+     "stage": "identity",
+     "event": "ehr_patient_lookup",
+     "ok": true,
+     "tool": "find_patient"
+    },
+    {
+     "t_ms": 17558,
+     "actor": "agent",
+     "stage": "intent",
+     "event": "confirmed_new_appointment",
+     "ok": true
+    },
+    {
+     "t_ms": 23534,
+     "actor": "agent",
+     "stage": "intent",
+     "event": "agent_repeated_question",
+     "ok": true
+    },
+    {
+     "t_ms": 28509,
+     "actor": "agent",
+     "stage": "intent",
+     "event": "agent_repeated_question",
+     "ok": true
+    },
+    {
+     "t_ms": 33170,
+     "actor": "agent",
+     "stage": "intent",
+     "event": "agent_repeated_question",
+     "ok": true
+    },
+    {
+     "t_ms": 34090,
+     "actor": "caller",
+     "stage": "complete",
+     "event": "hung_up",
+     "ok": false
+    },
+    {
+     "t_ms": 36396,
+     "actor": "system",
+     "stage": "complete",
+     "event": "call_ended",
+     "ok": true
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   },
+   "failure_mode": {
+    "type": "choice",
+    "instructions": "What is the dominant failure or success mode visible in the structure?",
+    "criteria": {
+     "clean_book": "Lookup, offer and booking all succeeded with little friction.",
+     "recovered_error": "An earlier tool, identity or booking failure was later overcome and the call booked.",
+     "identity_block": "Patient lookup or verification never succeeded.",
+     "no_availability": "Slot search or booking kept failing and the call stalled there.",
+     "info_only": "The caller only gathered information and never tried to book.",
+     "declined_offer": "The caller was offered a booking or slot and turned it down.",
+     "caller_drop": "Long silence, refusal, or hangup ended the call.",
+     "agent_loop": "Repeated stages or tools without forward progress.",
+     "other": "None of the above fits."
+    }
+   },
+   "agent_progress": {
+    "type": "score",
+    "instructions": "How far did the agent advance the scheduling workflow?",
+    "criteria": [
+     "Never got past greeting or identity",
+     "Reached intent or search but made no real offer",
+     "Offered a provider or slot but did not book",
+     "Completed a confirmed booking"
+    ]
+   },
+   "needs_human": {
+    "type": "noul",
+    "instructions": "Should a human receptionist have taken over, based on structure alone?",
+    "criteria": {
+     "true": "Stuck identity, refusal or silence, or repeated tool failure.",
+     "false": "The agent was still making workflow progress."
+    }
+   },
+   "visible_error_overweight": {
+    "type": "noul",
+    "instructions": "Does the trace contain an early visible error that a competent agent often recovers from (a failed lookup then retry, one failed booking then another slot)?"
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.08
+   },
+   "failure_mode": {
+    "type": "choice",
+    "choice": "agent_loop",
+    "probabilities": {
+     "identity_block": 0,
+     "recovered_error": 0,
+     "clean_book": 0,
+     "declined_offer": 0,
+     "caller_drop": 0.24,
+     "no_availability": 0,
+     "other": 0,
+     "info_only": 0,
+     "agent_loop": 0.76
+    },
+    "confidence": 0.72
+   },
+   "agent_progress": {
+    "type": "score",
+    "score": 1.18,
+    "legend": {
+     "0": "Never got past greeting or identity",
+     "1": "Reached intent or search but made no real offer",
+     "2": "Offered a provider or slot but did not book",
+     "3": "Completed a confirmed booking"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.9,
+     "2": 0.01,
+     "3": 0.09
+    },
+    "confidence": 0.81
+   },
+   "needs_human": {
+    "type": "noul",
+    "noul": 0.74
+   },
+   "visible_error_overweight": {
+    "type": "noul",
+    "noul": 0.17
+   }
+  },
+  "usage": {
+   "input_tokens": 1337,
+   "output_tokens": 168,
+   "cost": 5.6154e-05
+  },
+  "id": "gen-dec-1790964733-zzGRS14jUlPKOG6jTdP4",
+  "provider": "TypeSafe"
+ }
+}

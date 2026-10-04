@@ -28,7 +28,10 @@ streamlit run app.py
 - **Run:** pick a dataset and number of calls, see estimated requests, tokens and cost, set a **cost cap**, then run with a progress bar.
 - **Results:** cost, latency and contract errors; AUC for Jev vs non-LLM baselines (chart + table); calibration; failure-mode confusion; save or download.
 - **Call explorer:** P(book) trajectory per call (failed events marked), turn table, review answers, and the exact JSON state Jev saw at any turn.
+- **Analytics:** side-by-side run comparison (metrics table, AUC chart across runs, cost and latency).
+- **Benchmark:** same calls, three approaches — Jev vs B0/B1/B2 rules (instant, offline) vs a GLM chat scorer; combined accuracy (AUC) + performance (latency, $/call) table with a verdict line.
 - **Sign-off (E1–E7):** runs every synthetic call + the SGD test split with your connection (about $0.06 live), then the evals; saves `evals/REPORT_live.md`.
+- **Audit:** per-run contract (E1), no-leak (E2, scoped), shared-request-key replay risk, secret-hygiene scan of results + fixtures.
 - **Playground:** any `state` + `questions` JSON in one request.
 
 ## Run without a key (mock)
@@ -57,6 +60,14 @@ python run_evals.py --live --results results/sgd_test_live.json --synthetic-resu
 `record` saves every response under `fixtures/`. Afterwards, `JEV_MODE=replay` re-runs everything
 offline for free, and commit the fixtures if you want the run to be reproducible.
 Projected cost of the full SGD set (8,476 requests, about 5M input tokens): about **$0.21**.
+
+GLM scorer (`llm_client.py`, default `z-ai/glm-5.3` on the same key): answers the same typed
+questions through OpenRouter chat completions with JSON repair retries, so Jev wire shape,
+contract checks and evaluators work unchanged. Reasoning is always on (effort `low` by default);
+output/reasoning tokens bill ~$4.40/1M, so benchmark small N first. Fixtures are `glm_`-prefixed
+to never collide with Jev's. CLI: `simulate.py --scorer glm [--llm-model ...]`; smoke:
+`python llm_client.py --smoke`. The workbench **Benchmark** tab compares Jev vs rules vs GLM on
+the same calls (accuracy AUCs + latency p50 + $/call).
 
 If the smoke test returns 404: `export JEV_URL=https://openrouter.ai/api/v1/systemone JEV_MODEL=jev-1.13`.
 

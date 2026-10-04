@@ -1,0 +1,35 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "current_event": "identity_check_failed",
+   "current_stage": "identity"
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.15
+   }
+  },
+  "usage": {
+   "input_tokens": 364,
+   "output_tokens": 21,
+   "cost": 1.5288e-05
+  },
+  "id": "gen-dec-1790932858-kg9O7jGueAOlfrgMgMFX",
+  "provider": "TypeSafe"
+ }
+}

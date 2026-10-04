@@ -1,0 +1,127 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "east-clinic",
+   "specialty": "cardiology",
+   "forecast_after_event_index": 10,
+   "elapsed_ms": 45150,
+   "current_stage": "availability",
+   "current_event": "searched_open_slots",
+   "fail_count_so_far": 1,
+   "tool_calls_so_far": 3,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 5449,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "asked_dob_and_name",
+     "ok": true
+    },
+    {
+     "t_ms": 13756,
+     "actor": "caller",
+     "stage": "identity",
+     "event": "caller_went_silent",
+     "ok": false
+    },
+    {
+     "t_ms": 17608,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "repeated_identity_ask",
+     "ok": true
+    },
+    {
+     "t_ms": 20565,
+     "actor": "caller",
+     "stage": "identity",
+     "event": "provided_identifiers",
+     "ok": true
+    },
+    {
+     "t_ms": 25138,
+     "actor": "tool",
+     "stage": "identity",
+     "event": "ehr_patient_lookup",
+     "ok": true,
+     "tool": "find_patient"
+    },
+    {
+     "t_ms": 27722,
+     "actor": "agent",
+     "stage": "intent",
+     "event": "confirmed_follow_up",
+     "ok": true
+    },
+    {
+     "t_ms": 32645,
+     "actor": "tool",
+     "stage": "availability",
+     "event": "searched_open_slots",
+     "ok": true,
+     "tool": "search_slots",
+     "n_results": 2
+    },
+    {
+     "t_ms": 36493,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_two_slots",
+     "ok": true
+    },
+    {
+     "t_ms": 42059,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "asked_for_later_week",
+     "ok": true
+    },
+    {
+     "t_ms": 45150,
+     "actor": "tool",
+     "stage": "availability",
+     "event": "searched_open_slots",
+     "ok": true,
+     "tool": "search_slots",
+     "n_results": 1
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.5
+   }
+  },
+  "usage": {
+   "input_tokens": 1014,
+   "output_tokens": 21,
+   "cost": 4.2588e-05
+  },
+  "id": "gen-dec-1790964753-11Moqc0VofpzwNjz0c4M",
+  "provider": "TypeSafe"
+ }
+}

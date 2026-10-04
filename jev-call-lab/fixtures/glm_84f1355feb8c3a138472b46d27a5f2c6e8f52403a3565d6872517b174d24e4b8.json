@@ -1,0 +1,145 @@
+{
+ "request": {
+  "model": "z-ai/glm-5.3",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "south-clinic",
+   "specialty": "dermatology",
+   "forecast_after_event_index": 7,
+   "elapsed_ms": 34325,
+   "current_stage": "availability",
+   "current_event": "searched_open_slots",
+   "fail_count_so_far": 1,
+   "tool_calls_so_far": 2,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 5890,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "asked_dob_and_name",
+     "ok": true
+    },
+    {
+     "t_ms": 16664,
+     "actor": "caller",
+     "stage": "identity",
+     "event": "caller_went_silent",
+     "ok": false
+    },
+    {
+     "t_ms": 20260,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "repeated_identity_ask",
+     "ok": true
+    },
+    {
+     "t_ms": 23953,
+     "actor": "caller",
+     "stage": "identity",
+     "event": "provided_identifiers",
+     "ok": true
+    },
+    {
+     "t_ms": 29538,
+     "actor": "tool",
+     "stage": "identity",
+     "event": "ehr_patient_lookup",
+     "ok": true,
+     "tool": "find_patient"
+    },
+    {
+     "t_ms": 31629,
+     "actor": "agent",
+     "stage": "intent",
+     "event": "confirmed_follow_up",
+     "ok": true
+    },
+    {
+     "t_ms": 34325,
+     "actor": "tool",
+     "stage": "availability",
+     "event": "searched_open_slots",
+     "ok": true,
+     "tool": "search_slots",
+     "n_results": 2
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "usage": {
+  "prompt_tokens": 492,
+  "completion_tokens": 41,
+  "total_tokens": 533,
+  "cost": 0.0003200175,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 128,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.00032325,
+   "upstream_inference_prompt_cost": 0.00022075,
+   "upstream_inference_completions_cost": 0.0001025
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 23,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ },
+ "response": {
+  "model": "z-ai/glm-5.3",
+  "answers": {
+   "will_book": {
+    "noul": 0.8,
+    "type": "noul"
+   }
+  },
+  "usage": {
+   "prompt_tokens": 492,
+   "completion_tokens": 41,
+   "total_tokens": 533,
+   "cost": 0.0003200175,
+   "is_byok": false,
+   "prompt_tokens_details": {
+    "cached_tokens": 128,
+    "cache_write_tokens": 0,
+    "audio_tokens": 0,
+    "video_tokens": 0
+   },
+   "cost_details": {
+    "upstream_inference_cost": 0.00032325,
+    "upstream_inference_prompt_cost": 0.00022075,
+    "upstream_inference_completions_cost": 0.0001025
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 23,
+    "image_tokens": 0,
+    "audio_tokens": 0
+   },
+   "input_tokens": 492,
+   "output_tokens": 41
+  }
+ }
+}

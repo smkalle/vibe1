@@ -1,6 +1,6 @@
 # Eval report (mock)
 
-**Overall: PASS** (Jev mode: mock)
+**Overall: FAIL** (Jev mode: mock)
 
 
 | ID | Eval | Gate | Result | Detail |
@@ -10,7 +10,7 @@
 | E3 | Reducer fidelity | gate | PASS | 915 calls, 556 booked / 359 not |
 | E4 | Seed trajectories | gate | PASS | book-001 ends > 0.8: ok, book-001 rises over the call: ok, fail-002 ends < 0.2: ok, recover-003 dips after first failure: ok, recover-003 ends > 0.8: ok |
 | E5 | Signal on SGD test | gate | PASS | see below |
-| E6 | Record -> replay | gate | PASS | 24 fixtures over HTTP; replay identical=True; replay miss raises=True |
+| E6 | Record -> replay | gate | FAIL | 24 fixtures over HTTP; replay identical=False; replay miss raises=True |
 | E7 | Cost accounting | gate | PASS | see below |
 
 ## E5 Signal on SGD test
@@ -143,7 +143,7 @@ calls=167 booked=81 requests=1730 models=['mock-jev-heuristic']
 AUC   mid=0.9516 pre_outcome=0.9569 end=1.0 pre_outcome_attempted=None (n=78, not booked=1)
 Brier mid=0.1984 pre_outcome=0.2236 end=0.0111
 failure_mode agreement with rule reference: 1.0
-latency p50=0.04ms p95=0.07ms
+latency n/a: no network timings (mock)
 total USD=0.041382 (tokens_x_price), input tokens=985286
 ```
 
@@ -189,6 +189,6 @@ calls=153 booked=78 requests=1149 models=['mock-jev-heuristic']
 AUC   mid=0.6601 pre_outcome=0.7484 end=1.0 pre_outcome_attempted=0.6548 (n=131, not booked=53)
 Brier mid=0.2455 pre_outcome=0.1985 end=0.1394
 failure_mode agreement with rule reference: 1.0
-latency p50=0.03ms p95=0.05ms
+latency n/a: no network timings (mock)
 total USD=0.019731 (tokens_x_price), input tokens=469786
 ```

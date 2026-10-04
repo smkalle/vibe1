@@ -1,0 +1,112 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "east-clinic",
+   "specialty": "pediatrics",
+   "forecast_after_event_index": 8,
+   "elapsed_ms": 30546,
+   "current_stage": "availability",
+   "current_event": "searched_open_slots",
+   "fail_count_so_far": 2,
+   "tool_calls_so_far": 3,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 4999,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "asked_dob_and_name",
+     "ok": true
+    },
+    {
+     "t_ms": 7045,
+     "actor": "caller",
+     "stage": "identity",
+     "event": "provided_identifiers",
+     "ok": true
+    },
+    {
+     "t_ms": 10720,
+     "actor": "tool",
+     "stage": "identity",
+     "event": "ehr_patient_lookup",
+     "ok": false,
+     "tool": "find_patient"
+    },
+    {
+     "t_ms": 15498,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "identity_check_failed",
+     "ok": false
+    },
+    {
+     "t_ms": 20041,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "retried_with_phone_match",
+     "ok": true
+    },
+    {
+     "t_ms": 22874,
+     "actor": "tool",
+     "stage": "identity",
+     "event": "ehr_patient_lookup",
+     "ok": true,
+     "tool": "find_patient"
+    },
+    {
+     "t_ms": 28131,
+     "actor": "agent",
+     "stage": "intent",
+     "event": "confirmed_new_appointment",
+     "ok": true
+    },
+    {
+     "t_ms": 30546,
+     "actor": "tool",
+     "stage": "availability",
+     "event": "searched_open_slots",
+     "ok": true,
+     "tool": "search_slots",
+     "n_results": 4
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.61
+   }
+  },
+  "usage": {
+   "input_tokens": 908,
+   "output_tokens": 21,
+   "cost": 3.8136e-05
+  },
+  "id": "gen-dec-1790964741-VqAIOQlO78UkWRolJtis",
+  "provider": "TypeSafe"
+ }
+}

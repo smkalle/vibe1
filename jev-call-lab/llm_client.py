@@ -43,6 +43,9 @@ FIXTURE_PREFIX = "glm_"
 # (measured: forecast mean 37 / p95 53, review mean 242 / max 282 tokens).
 EST_COMPLETION_TOKENS_FORECAST = 150
 EST_COMPLETION_TOKENS_REVIEW = 600
+# Expected sizes (live means above), for "what will this probably cost" rather than the cap.
+EXP_COMPLETION_TOKENS_FORECAST = 37
+EXP_COMPLETION_TOKENS_REVIEW = 242
 
 
 def mode() -> str:
@@ -182,8 +185,10 @@ def project_cost(calls, review=True):
             tokens_out += EST_COMPLETION_TOKENS_REVIEW
             n_req += 1
     usd = tokens_in * PRICE_IN_PER_TOKEN + tokens_out * PRICE_OUT_PER_TOKEN
+    exp_out = tokens_out * EXP_COMPLETION_TOKENS_FORECAST / EST_COMPLETION_TOKENS_FORECAST if not review else \
+        sum(EXP_COMPLETION_TOKENS_FORECAST * len(_fp(c["events"])) + EXP_COMPLETION_TOKENS_REVIEW for c in calls)
     return {"requests": n_req, "input_tokens": tokens_in, "est_completion_tokens": tokens_out,
-            "usd": round(usd, 4)}
+            "usd": round(usd, 4), "usd_expected": round(tokens_in * PRICE_IN_PER_TOKEN + exp_out * PRICE_OUT_PER_TOKEN, 4)}
 
 
 # transport ---------------------------------------------------------------------

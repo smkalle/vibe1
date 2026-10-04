@@ -16,23 +16,45 @@ Latest eval report: [`evals/REPORT.md`](evals/REPORT.md).
 
 Regenerate them with `python generate_synthetic.py` and `python reduce_sgd.py --fetch`.
 
-## Workbench UI
+## Workbench UI (v2: guided benchmark workflow)
 
 ```bash
-pip install -r requirements.txt
-streamlit run app.py
+./run.sh          # creates .venv, installs deps, opens http://localhost:8501
+./run.sh check    # offline tests + evals E1-E7 instead
 ```
 
-- **Sidebar:** mode (mock / live / record / replay), **OpenRouter key per session** (password field, held only in that browser
-  session's memory, never written to disk, results or fixtures; "Forget key" clears it), endpoint preset, URL, model, and **Test connection**.
-- **Run:** pick a dataset and number of calls, see estimated requests, tokens and cost, set a **cost cap**, then run with a progress bar.
-- **Results:** cost, latency and contract errors; AUC for Jev vs non-LLM baselines (chart + table); calibration; failure-mode confusion; save or download.
-- **Call explorer:** P(book) trajectory per call (failed events marked), turn table, review answers, and the exact JSON state Jev saw at any turn.
-- **Analytics:** side-by-side run comparison (metrics table, AUC chart across runs, cost and latency).
-- **Benchmark:** same calls, three approaches — Jev vs B0/B1/B2 rules (instant, offline) vs a GLM chat scorer; combined accuracy (AUC) + performance (latency, $/call) table with a verdict line.
-- **Sign-off (E1–E7):** runs every synthetic call + the SGD test split with your connection (about $0.06 live), then the evals; saves `evals/REPORT_live.md`.
-- **Audit:** per-run contract (E1), no-leak (E2, scoped), shared-request-key replay risk, secret-hygiene scan of results + fixtures.
-- **Playground:** any `state` + `questions` JSON in one request.
+`run.sh` uses a venv because Arch-based systems (e.g. Omarchy) block system-wide pip. Manual equivalent:
+`python -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/streamlit run app.py`.
+Start in **replay** mode (the default) for real recorded Jev and GLM answers with no key and no spend. Paste an OpenRouter
+key in step ① only for live, record or the latency probe.
+
+Spec: [`../specs/jev-workbench-v2.md`](../specs/jev-workbench-v2.md). Two views share one app:
+
+- **Workflow** (operators), six steps:
+  1. **Connect:** pick a source *per approach*. Replay (real recorded live answers, free), live, record or mock.
+     The OpenRouter key is held in session memory only; "Forget key" clears it.
+  2. **Corpus:** a built-in corpus, plus a profile card including *how readable the outcome is from structure alone*
+     (if a free rule already scores high, LLMs are unlikely to add accuracy).
+  3. **Plan:** use cases (in-call escalation, post-call QA, bulk analytics), approaches (two free rules, Jev, GLM),
+     a **frozen, stratified, seeded sample** with its expected precision, and expected and worst-case cost with a cap.
+  4. **Run:** results are saved per call (resumable) and the run pauses at the cap. The **latency probe** measures 20
+     sequential decisions after 3 warm-ups. You can import external results, stating their provenance explicitly.
+  5. **Compare:** a plain-language verdict per use case, accuracy vs cost with 95% CIs, latency vs budget, and cost at
+     your monthly volume. With technical details on: paired CIs for every metric, a paired-difference plot, and a call overlay.
+  6. **Decide & export:** a quality gate per approach (E1 contract, E2 no leak, secret scan of the workspace),
+     recorded decisions, and a Markdown report, scorecard JSON and run manifests.
+- **Summary** (business readers): the verdict cards and charts for the project's latest benchmark.
+- **Tools** (with technical details on): Audit, lab sign-off (E1–E7) and Playground (Jev or GLM).
+
+Benchmark rules the engine enforces (`benchmark.py`, `stats.py`, `sampling.py`):
+- Every approach scores the same frozen sample; mismatched samples, corpora or question sets are refused.
+- CIs come from a paired cluster bootstrap over calls.
+- A winner needs a paired CI that excludes 0. Otherwise it's a tie, broken by cost, then latency.
+- Approaches over the latency budget are excluded. Mock and old-replay timings never count as latency.
+
+Work is saved under `workspace/<project>/` (gitignored; `$JEV_WORKSPACE` overrides it): samples, run manifests
+(never the key), per-call results. The CLI does the same:
+`python benchmark.py --project demo --corpus synthetic --n 120 --approaches rules_b1,rules_b2,jev,glm`.
 
 ## Run without a key (mock)
 

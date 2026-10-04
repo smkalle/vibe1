@@ -1,6 +1,6 @@
 # Eval report (mock)
 
-**Overall: FAIL** (Jev mode: mock)
+**Overall: PASS** (Jev mode: mock)
 
 
 | ID | Eval | Gate | Result | Detail |
@@ -10,7 +10,7 @@
 | E3 | Reducer fidelity | gate | PASS | 915 calls, 556 booked / 359 not |
 | E4 | Seed trajectories | gate | PASS | book-001 ends > 0.8: ok, book-001 rises over the call: ok, fail-002 ends < 0.2: ok, recover-003 dips after first failure: ok, recover-003 ends > 0.8: ok |
 | E5 | Signal on SGD test | gate | PASS | see below |
-| E6 | Record -> replay | gate | FAIL | 24 fixtures over HTTP; replay identical=False; replay miss raises=True |
+| E6 | Record -> replay | gate | PASS | 24 fixtures over HTTP; replay identical=True; replay miss raises=True |
 | E7 | Cost accounting | gate | PASS | see below |
 
 ## E5 Signal on SGD test

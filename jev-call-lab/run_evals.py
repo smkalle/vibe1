@@ -143,7 +143,7 @@ def e6_record_replay(calls):
             os.environ["JEV_MODE"] = "replay"
             replayed = run(calls, workers=4, quiet=True)
             strip = lambda rs: [
-                {**r, "turns": [{k: v for k, v in t.items() if k != "latency_ms"} for t in r["turns"]], "review_latency_ms": 0}
+                {**r, "turns": [{k: v for k, v in t.items() if k not in ("latency_ms", "latency_source")} for t in r["turns"]], "review_latency_ms": 0}
                 for r in rs
             ]
             same = strip(recorded) == strip(replayed)
@@ -239,7 +239,7 @@ def main():
     lines = md.split("\n")
     Path(args.out).parent.mkdir(exist_ok=True)
     Path(args.out).write_text("\n".join(lines))
-    print("\n".join(lines[:12]))
+    print("\n".join(l for l in lines if l.startswith(("#", "**", "|"))).split("\n## E5")[0])
     print(f"\nwrote {args.out}")
     raise SystemExit(0 if all_ok else 1)
 

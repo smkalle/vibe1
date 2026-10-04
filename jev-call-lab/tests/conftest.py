@@ -15,6 +15,7 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setenv("JEV_MODE", "mock")
     monkeypatch.setenv("LLM_MODE", "mock")
     monkeypatch.setenv("JEV_FIXTURES", str(tmp_path / "fixtures"))
+    monkeypatch.setenv("JEV_WORKSPACE", str(tmp_path / "workspace"))
 
 
 @pytest.fixture

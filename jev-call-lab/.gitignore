@@ -2,3 +2,5 @@ data/raw/
 results/
 __pycache__/
 .pytest_cache/
+workspace/
+.venv/

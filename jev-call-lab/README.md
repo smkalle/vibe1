@@ -88,8 +88,8 @@ questions through OpenRouter chat completions with JSON repair retries, so Jev w
 contract checks and evaluators work unchanged. Reasoning is always on (effort `low` by default);
 output/reasoning tokens bill ~$4.40/1M, so benchmark small N first. Fixtures are `glm_`-prefixed
 to never collide with Jev's. CLI: `simulate.py --scorer glm [--llm-model ...]`; smoke:
-`python llm_client.py --smoke`. The workbench **Benchmark** tab compares Jev vs rules vs GLM on
-the same calls (accuracy AUCs + latency p50 + $/call).
+`python llm_client.py --smoke`. The workbench **Compare** step scores Jev vs rules vs GLM on
+the same frozen sample (paired AUCs with CIs + latency probe + $/call, verdict rule).
 
 If the smoke test returns 404: `export JEV_URL=https://openrouter.ai/api/v1/systemone JEV_MODEL=jev-1.13`.
 

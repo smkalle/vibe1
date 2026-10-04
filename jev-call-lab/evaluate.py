@@ -73,7 +73,12 @@ def calibration(rows, bins=5):
 
 
 def metrics(results):
-    latencies = [t["latency_ms"] for r in results for t in r["turns"]]
+    # Only network latency counts: live calls, or live times saved in fixtures. Results written
+    # before latency_source existed came from live runs, hence the "measured" default.
+    real = {"measured", "recorded"}
+    turns = [t for r in results for t in r["turns"]]
+    latencies = [t["latency_ms"] for t in turns if t.get("latency_source", "measured") in real]
+    latency_sources = sorted({t.get("latency_source", "measured") for t in turns})
     cost = sum(t["cost_usd"] for r in results for t in r["turns"]) + sum(r.get("review_cost_usd", 0) for r in results)
     tokens = sum(t["input_tokens"] for r in results for t in r["turns"]) + sum(r.get("review_input_tokens", 0) for r in results)
     n_req = sum(len(r["turns"]) + (1 if r.get("review") else 0) for r in results)
@@ -99,7 +104,11 @@ def metrics(results):
             "input_tokens": tokens,
             "source": sorted({r.get("cost_source", "tokens_x_price") for r in results}),
         },
-        "latency_ms": {"p50": round(_pct(latencies, 0.5), 2), "p95": round(_pct(latencies, 0.95), 2)},
+        "latency_ms": {
+            "p50": round(_pct(latencies, 0.5), 2) if latencies else None,
+            "p95": round(_pct(latencies, 0.95), 2) if latencies else None,
+            "sources": latency_sources,
+        },
         "models": sorted({str(r.get("model")) for r in results}),
     }
 
@@ -163,7 +172,9 @@ def render(results, max_calls=None):
         f"(n={m['n_attempted_booking']}, not booked={m['n_attempted_not_booked']})",
         f"Brier mid={m['brier']['mid']} pre_outcome={m['brier']['pre_outcome']} end={m['brier']['end']}",
         f"failure_mode agreement with rule reference: {m['failure_mode']['agreement_with_rule_reference']}",
-        f"latency p50={m['latency_ms']['p50']}ms p95={m['latency_ms']['p95']}ms",
+        (f"latency p50={m['latency_ms']['p50']}ms p95={m['latency_ms']['p95']}ms ({', '.join(m['latency_ms']['sources'])})"
+         if m["latency_ms"]["p50"] is not None else
+         f"latency n/a: no network timings ({', '.join(m['latency_ms']['sources'])})"),
         f"total USD={m['cost']['total_usd']:.6f} ({', '.join(m['cost']['source'])}), input tokens={m['cost']['input_tokens']}",
     ]
     return "\n".join(lines)

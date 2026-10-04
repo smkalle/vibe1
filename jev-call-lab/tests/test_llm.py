@@ -174,3 +174,42 @@ def test_record_and_replay(tmp_path):
 def test_config_rejects_unknown_mode():
     with pytest.raises(JevError):
         llm_client.Config(mode="bogus")
+
+
+# latency provenance ----------------------------------------------------------------
+def test_record_saves_latency_and_replay_returns_it(monkeypatch, tmp_path):
+    """Replays must report the live call's time, never the local file read."""
+    import threading
+    import jev_client
+    import mock_jev
+    from questions import WILL_BOOK
+
+    srv = mock_jev.make_server(0)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{srv.server_address[1]}/api/alpha/decisions"
+    rec = jev_client.Config(mode="record", api_key="k", url=url, fixtures=tmp_path)
+    try:
+        live = jev_client.decide({"s": 1}, WILL_BOOK, cfg=rec)
+    finally:
+        srv.shutdown()
+    assert live["_latency_source"] == "measured"
+    saved = json.loads(next(tmp_path.glob("*.json")).read_text())
+    assert saved["latency_ms"] > 0
+
+    saved["latency_ms"] = 4321.0
+    next(tmp_path.glob("*.json")).write_text(json.dumps(saved))
+    rep = jev_client.decide({"s": 1}, WILL_BOOK, cfg=jev_client.Config(mode="replay", fixtures=tmp_path))
+    assert (rep["_latency_ms"], rep["_latency_source"]) == (4321.0, "recorded")
+
+
+def test_old_fixture_replay_and_mock_latency_are_not_network_time(tmp_path):
+    import evaluate
+    import jev_client
+
+    assert jev_client.latency_of("replay", 0.2, None) == (0.2, "replay_local")
+    assert jev_client.latency_of("mock", 0.1, None)[1] == "mock"
+    fake = [{"label_booked": True, "turns": [{"latency_ms": 0.2, "latency_source": "replay_local", "input_tokens": 1, "p_book": 0.5, "event_index": 0,
+                                              "cost_usd": 0.0}], "reference_failure_mode": "x",
+             "n_events": 2, "decision_index": 1, "attempted_booking": False}]
+    lat = evaluate.metrics(fake)["latency_ms"]
+    assert lat["p50"] is None and lat["sources"] == ["replay_local"]

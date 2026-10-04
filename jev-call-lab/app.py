@@ -313,7 +313,9 @@ with tab_results:
         k[0].metric("Calls (booked)", f"{m['n_calls']} ({m['n_booked']})")
         k[1].metric("Requests", f"{m['n_requests']:,}")
         k[2].metric("Cost (USD)", f"${m['cost']['total_usd']:.5f}", help=f"source: {', '.join(m['cost']['source'])}")
-        k[3].metric("Latency p50 / p95", f"{m['latency_ms']['p50']:.0f} / {m['latency_ms']['p95']:.0f} ms")
+        lat = m["latency_ms"]
+        k[3].metric("Latency p50 / p95", f"{lat['p50']:.0f} / {lat['p95']:.0f} ms" if lat["p50"] is not None else "n/a",
+                    help="Network time only: live calls, or live times saved in fixtures. Sources: " + ", ".join(lat["sources"]))
         contract_bad = sum(bool(t.get("errors")) for r in res for t in r["turns"]) + sum(bool(r.get("review_errors")) for r in res)
         k[4].metric("Contract errors", contract_bad)
         if run["errors"]:
@@ -527,10 +529,13 @@ with tab_bench:
         if scored:
             best = max(scored, key=lambda b: b["auc_pre_outcome"])
             cheap = min([b for b in brows if b["requests"]], key=lambda b: b["usd_per_call"])
-            fast = min([b for b in brows if b["requests"]], key=lambda b: b["latency_p50_ms"])
+            # Only runs with real network timings compete; mock and old replays time a local read.
+            timed = [b for b in brows if b["requests"] and b["latency_p50_ms"] is not None]
+            fast_txt = (f"fastest: **{(f := min(timed, key=lambda b: b['latency_p50_ms']))['scorer']}** "
+                        f"({f['latency_p50_ms']:.0f} ms p50)" if timed else "fastest: n/a (no network timings in these runs)")
             st.caption(f"Best pre_outcome AUC: **{best['scorer']}** ({best['auc_pre_outcome']:.3f}) · "
                        f"cheapest: **{cheap['scorer']}** (${cheap['usd_per_call']:.5f}/call) · "
-                       f"fastest: **{fast['scorer']}** ({fast['latency_p50_ms']:.0f} ms p50). "
+                       f"{fast_txt}. "
                        f"Rules cost $0 and run offline; LLM runs on {b_limit} calls from {b_file}.")
     else:
         st.info("Score the rules and run (or pick) at least one LLM scorer to fill the table.")

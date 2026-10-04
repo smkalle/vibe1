@@ -56,6 +56,7 @@ def forecast_call(call: dict, review: bool = True, cfg=None, decide_fn=None, sco
             "ok": events[idx]["ok"],
             "p_book": resp["answers"]["will_book"]["noul"],
             "latency_ms": resp["_latency_ms"],
+            "latency_source": resp.get("_latency_source", "measured"),
             "cost_usd": resp["_cost_usd"],
             "input_tokens": resp.get("usage", {}).get("input_tokens", 0),
             "errors": validate_response(WILL_BOOK, resp),

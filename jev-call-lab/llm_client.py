@@ -26,7 +26,7 @@ from typing import Any
 import requests
 
 import mock_jev
-from jev_client import JevError, validate_response
+from jev_client import JevError, latency_of, validate_response
 
 DEFAULT_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = "z-ai/glm-5.3"
@@ -248,12 +248,14 @@ def decide(state: Any, questions: dict, timeout: float = 90.0, cfg: Config | Non
     fixture = cfg.fixtures / f"{fixture_key(cfg.model, state, questions)}.json"
 
     t0 = time.perf_counter()
+    recorded_ms = None
     if m == "mock":
         body = mock_jev.answer({"model": cfg.model, "state": state, "questions": questions})
     elif m == "replay":
         if not fixture.exists():
             raise JevError(f"replay miss: no fixture {fixture.name} (record it first with LLM_MODE=record)")
         saved = json.loads(fixture.read_text())
+        recorded_ms = saved.get("latency_ms")
         body, usage = saved["response"], _norm_usage(saved.get("usage", {}))
         body = {**body, "usage": usage or body.get("usage", {})}
     else:
@@ -280,8 +282,9 @@ def decide(state: Any, questions: dict, timeout: float = 90.0, cfg: Config | Non
         if m == "record":
             fixture.parent.mkdir(parents=True, exist_ok=True)
             fixture.write_text(json.dumps({"request": {"model": cfg.model, "state": state, "questions": questions},
-                                           "usage": usage, "response": body}, indent=1))
-    latency_ms = (time.perf_counter() - t0) * 1000
+                                           "usage": usage, "response": body,
+                                           "latency_ms": (time.perf_counter() - t0) * 1000}, indent=1))
+    latency_ms, latency_source = latency_of(m, (time.perf_counter() - t0) * 1000, recorded_ms)
 
     usage = body.get("usage") or {}
     if m == "mock":
@@ -290,7 +293,8 @@ def decide(state: Any, questions: dict, timeout: float = 90.0, cfg: Config | Non
         source = "tokens_x_price"
     else:
         cost, source = _usage_cost(usage)
-    return {**body, "_latency_ms": latency_ms, "_cost_usd": cost, "_cost_source": source, "_mode": m}
+    return {**body, "_latency_ms": latency_ms, "_latency_source": latency_source,
+            "_cost_usd": cost, "_cost_source": source, "_mode": m}
 
 
 def _smoke():

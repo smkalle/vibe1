@@ -1,0 +1,19 @@
+{
+  "desk_watcher": {
+    "camera_index": 0,
+    "width": 640,
+    "height": 480,
+    "interval_sec": 2.0,
+    "cooldown_sec": 60,
+    "min_area": 2500,
+    "diff_threshold": 25,
+    "blur": 21,
+    "snapshot_dir": "snapshots",
+    "send_enabled": true
+  },
+  "health_sentinel": {
+    "temp_crit": 90.0,
+    "disk_min_free_gb": 5.0,
+    "mem_min_avail_mb": 500
+  }
+}

@@ -1,0 +1,6 @@
+# Never commit secrets or local state.
+snapshots/
+events.log
+*.token
+upstream/
+__pycache__/

@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# gadgetctl — safe, phone-friendly control surface for the Muse desk gadget.
+# Designed to be the only thing a Termux SSH key is allowed to run
+# (authorized_keys: command="/usr/local/bin/gadgetctl $SSH_ORIGINAL_COMMAND"...),
+# but equally handy over an interactive shell. Read-mostly; nothing here
+# touches the SDK token or pairing state.
+set -uo pipefail
+
+RUNTIME="/opt/muse-gadget-watcher"
+SNAPS="$RUNTIME/snapshots"
+CAM=/dev/video0
+
+usage() {
+    echo "usage: gadgetctl status|snap|health|events|log|help"
+}
+
+cmd_status() {
+    for u in musegadget.service desk-watcher.service; do
+        printf '%-22s %s\n' "$u" "$(systemctl is-active "$u" 2>/dev/null || echo unknown)"
+    done
+    echo "--- musegadget ---"
+    sudo -n musegadget info 2>/dev/null || musegadget info 2>/dev/null || echo "(musegadget info needs sudo)"
+    echo "--- latest snapshot ---"
+    ls -t "$SNAPS"/*.jpg 2>/dev/null | head -1 || echo "(none yet)"
+}
+
+cmd_snap() {
+    # Try a live frame; fall back to the newest watcher snapshot when the
+    # camera is busy (the watcher service usually holds it open).
+    local out="/tmp/gadget-snap-$(date +%Y%m%d-%H%M%S).jpg"
+    if ffmpeg -hide_banner -loglevel error -y -f v4l2 -i "$CAM" -frames:v 1 "$out" 2>/dev/null; then
+        echo "$out"
+    else
+        local latest
+        latest="$(ls -t "$SNAPS"/*.jpg 2>/dev/null | head -1 || true)"
+        if [ -n "$latest" ]; then echo "$latest (latest, camera busy)"; else
+            echo "ERROR: camera busy and no snapshots yet" >&2; return 1; fi
+    fi
+}
+
+cmd_health() {
+    /usr/bin/python3 "$RUNTIME/health_sentinel.py" --check
+}
+
+cmd_events() {
+    tail -n 20 "$RUNTIME/events.log" 2>/dev/null || echo "(no local events; service forwards to Muse when paired)"
+}
+
+cmd_log() {
+    journalctl -u desk-watcher --no-pager -n 20 2>/dev/null || sudo -n journalctl -u desk-watcher --no-pager -n 20
+}
+
+case "${1:-help}" in
+    status) cmd_status ;;
+    snap) cmd_snap ;;
+    health) cmd_health ;;
+    events) cmd_events ;;
+    log) cmd_log ;;
+    *) usage ;;
+esac

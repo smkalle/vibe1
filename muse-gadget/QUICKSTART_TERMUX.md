@@ -10,8 +10,24 @@ No Muse app, no region lock — just SSH over Tailscale.
 
 ## 2. Install the controller (on the phone)
 
+Base Termux:
+
 ```bash
 pkg install -y openssh termux-api
+```
+
+Alpine proot instead (`proot-distro`): same script, one different setup —
+inside the Alpine shell:
+
+```sh
+apk add openssh curl python3
+```
+
+Then (either shell) — note: `termux-open`/`termux-api` only exist in base
+Termux. In Alpine the `photo` command serves the picture over localhost
+(proot shares it with Termux) and prints a URL to open in any phone browser:
+
+```bash
 mkdir -p ~/gadget && cd ~/gadget
 curl -fsSL https://raw.githubusercontent.com/smkalle/vibe1/main/muse-gadget/termux_controller.sh \
   -o termux_controller.sh

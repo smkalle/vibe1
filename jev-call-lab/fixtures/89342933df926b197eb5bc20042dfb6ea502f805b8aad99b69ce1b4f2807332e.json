@@ -1,0 +1,112 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "south-clinic",
+   "specialty": "orthopedics",
+   "forecast_after_event_index": 8,
+   "elapsed_ms": 29248,
+   "current_stage": "booking",
+   "current_event": "create_appointment",
+   "fail_count_so_far": 0,
+   "tool_calls_so_far": 3,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 4535,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "asked_dob_and_name",
+     "ok": true
+    },
+    {
+     "t_ms": 7870,
+     "actor": "caller",
+     "stage": "identity",
+     "event": "provided_identifiers",
+     "ok": true
+    },
+    {
+     "t_ms": 12043,
+     "actor": "tool",
+     "stage": "identity",
+     "event": "ehr_patient_lookup",
+     "ok": true,
+     "tool": "find_patient"
+    },
+    {
+     "t_ms": 17255,
+     "actor": "agent",
+     "stage": "intent",
+     "event": "confirmed_follow_up",
+     "ok": true
+    },
+    {
+     "t_ms": 20272,
+     "actor": "tool",
+     "stage": "availability",
+     "event": "searched_open_slots",
+     "ok": true,
+     "tool": "search_slots",
+     "n_results": 1
+    },
+    {
+     "t_ms": 23055,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_one_slot",
+     "ok": true
+    },
+    {
+     "t_ms": 27134,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "accepted_slot",
+     "ok": true
+    },
+    {
+     "t_ms": 29248,
+     "actor": "tool",
+     "stage": "booking",
+     "event": "create_appointment",
+     "ok": true,
+     "tool": "book"
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.91
+   }
+  },
+  "usage": {
+   "input_tokens": 903,
+   "output_tokens": 21,
+   "cost": 3.7926e-05
+  },
+  "id": "gen-dec-1790964733-lW3PAfMumctnmAvto8by",
+  "provider": "TypeSafe"
+ }
+}

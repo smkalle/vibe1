@@ -1,0 +1,81 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "south-clinic",
+   "specialty": "pediatrics",
+   "forecast_after_event_index": 4,
+   "elapsed_ms": 20552,
+   "current_stage": "intent",
+   "current_event": "confirmed_new_appointment",
+   "fail_count_so_far": 0,
+   "tool_calls_so_far": 1,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 5943,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "asked_dob_and_name",
+     "ok": true
+    },
+    {
+     "t_ms": 11424,
+     "actor": "caller",
+     "stage": "identity",
+     "event": "provided_identifiers",
+     "ok": true
+    },
+    {
+     "t_ms": 16998,
+     "actor": "tool",
+     "stage": "identity",
+     "event": "ehr_patient_lookup",
+     "ok": true,
+     "tool": "find_patient"
+    },
+    {
+     "t_ms": 20552,
+     "actor": "agent",
+     "stage": "intent",
+     "event": "confirmed_new_appointment",
+     "ok": true
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.73
+   }
+  },
+  "usage": {
+   "input_tokens": 700,
+   "output_tokens": 21,
+   "cost": 2.94e-05
+  },
+  "id": "gen-dec-1790964755-nE1h8eS8CSqShQfHrXHa",
+  "provider": "TypeSafe"
+ }
+}

@@ -1,0 +1,306 @@
+{
+ "request": {
+  "model": "z-ai/glm-5.3",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "Services_2",
+   "specialty": "dentist",
+   "forecast_after_event_index": 23,
+   "elapsed_ms": 58580,
+   "current_stage": "confirm",
+   "current_event": "readback_details",
+   "fail_count_so_far": 2,
+   "tool_calls_so_far": 2,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 400,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "stated_intent_find",
+     "ok": true
+    },
+    {
+     "t_ms": 3220,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 6040,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 8860,
+     "actor": "tool",
+     "stage": "discovery",
+     "event": "search_providers",
+     "ok": true,
+     "tool": "find_provider",
+     "n_results": 7
+    },
+    {
+     "t_ms": 10410,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_provider",
+     "ok": true,
+     "slots": [
+      "dentist_name",
+      "city"
+     ]
+    },
+    {
+     "t_ms": 12320,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 12370,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "asked_for_alternatives",
+     "ok": true
+    },
+    {
+     "t_ms": 16420,
+     "actor": "tool",
+     "stage": "discovery",
+     "event": "search_providers",
+     "ok": true,
+     "tool": "find_provider",
+     "n_results": 10
+    },
+    {
+     "t_ms": 17970,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_provider",
+     "ok": true,
+     "slots": [
+      "dentist_name",
+      "city"
+     ]
+    },
+    {
+     "t_ms": 20200,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "selected_offer",
+     "ok": true
+    },
+    {
+     "t_ms": 21740,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_to_book",
+     "ok": true
+    },
+    {
+     "t_ms": 25200,
+     "actor": "caller",
+     "stage": "details",
+     "event": "accepted_booking_offer",
+     "ok": true
+    },
+    {
+     "t_ms": 28020,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "appointment_time"
+     ]
+    },
+    {
+     "t_ms": 31800,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_time"
+     ]
+    },
+    {
+     "t_ms": 36540,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 40320,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 42180,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "dentist_name",
+      "appointment_time",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 48200,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 48250,
+     "actor": "caller",
+     "stage": "confirm",
+     "event": "declined",
+     "ok": false
+    },
+    {
+     "t_ms": 51340,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "appointment_time",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 56080,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_time"
+     ]
+    },
+    {
+     "t_ms": 56130,
+     "actor": "caller",
+     "stage": "confirm",
+     "event": "declined",
+     "ok": false
+    },
+    {
+     "t_ms": 58580,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "appointment_time",
+      "appointment_date"
+     ]
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "usage": {
+  "prompt_tokens": 983,
+  "completion_tokens": 36,
+  "total_tokens": 1019,
+  "cost": 0.000759627,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.0007673,
+   "upstream_inference_prompt_cost": 0.0006881,
+   "upstream_inference_completions_cost": 7.92e-05
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 12,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ },
+ "response": {
+  "model": "z-ai/glm-5.3",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.55
+   }
+  },
+  "usage": {
+   "prompt_tokens": 983,
+   "completion_tokens": 36,
+   "total_tokens": 1019,
+   "cost": 0.000759627,
+   "is_byok": false,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cache_write_tokens": 0,
+    "audio_tokens": 0,
+    "video_tokens": 0
+   },
+   "cost_details": {
+    "upstream_inference_cost": 0.0007673,
+    "upstream_inference_prompt_cost": 0.0006881,
+    "upstream_inference_completions_cost": 7.92e-05
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 12,
+    "image_tokens": 0,
+    "audio_tokens": 0
+   },
+   "input_tokens": 983,
+   "output_tokens": 36
+  }
+ }
+}

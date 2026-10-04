@@ -1,0 +1,215 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "Services_4",
+   "specialty": "therapist",
+   "forecast_after_event_index": 17,
+   "elapsed_ms": 43780,
+   "current_stage": "confirm",
+   "current_event": "readback_details",
+   "fail_count_so_far": 0,
+   "tool_calls_so_far": 1,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 400,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "stated_intent_find",
+     "ok": true
+    },
+    {
+     "t_ms": 3860,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "type"
+     ]
+    },
+    {
+     "t_ms": 7320,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "type"
+     ]
+    },
+    {
+     "t_ms": 9500,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 13280,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 16740,
+     "actor": "tool",
+     "stage": "discovery",
+     "event": "search_providers",
+     "ok": true,
+     "tool": "find_provider",
+     "n_results": 2
+    },
+    {
+     "t_ms": 18290,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_provider",
+     "ok": true,
+     "slots": [
+      "therapist_name",
+      "type",
+      "city"
+     ]
+    },
+    {
+     "t_ms": 18340,
+     "actor": "agent",
+     "stage": "discovery",
+     "event": "gave_result_count",
+     "ok": true
+    },
+    {
+     "t_ms": 23080,
+     "actor": "caller",
+     "stage": "info",
+     "event": "asked_info",
+     "ok": true,
+     "slots": [
+      "phone_number"
+     ]
+    },
+    {
+     "t_ms": 25580,
+     "actor": "agent",
+     "stage": "info",
+     "event": "gave_info",
+     "ok": true,
+     "slots": [
+      "phone_number"
+     ]
+    },
+    {
+     "t_ms": 27760,
+     "actor": "caller",
+     "stage": "info",
+     "event": "asked_info",
+     "ok": true,
+     "slots": [
+      "address"
+     ]
+    },
+    {
+     "t_ms": 29940,
+     "actor": "agent",
+     "stage": "info",
+     "event": "gave_info",
+     "ok": true,
+     "slots": [
+      "address"
+     ]
+    },
+    {
+     "t_ms": 33080,
+     "actor": "caller",
+     "stage": "details",
+     "event": "stated_intent_book",
+     "ok": true
+    },
+    {
+     "t_ms": 33130,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "selected_offer",
+     "ok": true
+    },
+    {
+     "t_ms": 36540,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "appointment_date",
+      "appointment_time"
+     ]
+    },
+    {
+     "t_ms": 40000,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_time",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 43780,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "therapist_name",
+      "appointment_time",
+      "appointment_date"
+     ]
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.76
+   }
+  },
+  "usage": {
+   "input_tokens": 1453,
+   "output_tokens": 21,
+   "cost": 6.1026e-05
+  },
+  "id": "gen-dec-1790964774-mXGPp32USBl8L4lE5R1f",
+  "provider": "TypeSafe"
+ }
+}

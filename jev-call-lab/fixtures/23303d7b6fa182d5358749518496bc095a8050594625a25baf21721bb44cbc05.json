@@ -1,0 +1,98 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "Services_4",
+   "specialty": "therapist",
+   "forecast_after_event_index": 5,
+   "elapsed_ms": 13660,
+   "current_stage": "discovery",
+   "current_event": "search_providers",
+   "fail_count_so_far": 0,
+   "tool_calls_so_far": 1,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 400,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 450,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "stated_intent_find",
+     "ok": true
+    },
+    {
+     "t_ms": 5460,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "type"
+     ]
+    },
+    {
+     "t_ms": 10520,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "type"
+     ]
+    },
+    {
+     "t_ms": 13660,
+     "actor": "tool",
+     "stage": "discovery",
+     "event": "search_providers",
+     "ok": true,
+     "tool": "find_provider",
+     "n_results": 3
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.47
+   }
+  },
+  "usage": {
+   "input_tokens": 781,
+   "output_tokens": 21,
+   "cost": 3.2802e-05
+  },
+  "id": "gen-dec-1790964771-OePiqmNAozdvvJTPQ3jk",
+  "provider": "TypeSafe"
+ }
+}

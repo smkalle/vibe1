@@ -1,0 +1,335 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "Services_1",
+   "specialty": "salon",
+   "forecast_after_event_index": 31,
+   "elapsed_ms": 73820,
+   "current_stage": "booking",
+   "current_event": "booking_confirmed",
+   "fail_count_so_far": 0,
+   "tool_calls_so_far": 4,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 400,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "stated_intent_find",
+     "ok": true
+    },
+    {
+     "t_ms": 3540,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 6360,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 9180,
+     "actor": "tool",
+     "stage": "discovery",
+     "event": "search_providers",
+     "ok": true,
+     "tool": "find_provider",
+     "n_results": 9
+    },
+    {
+     "t_ms": 10730,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_provider",
+     "ok": true,
+     "slots": [
+      "stylist_name",
+      "city"
+     ]
+    },
+    {
+     "t_ms": 13600,
+     "actor": "caller",
+     "stage": "info",
+     "event": "asked_info",
+     "ok": true,
+     "slots": [
+      "phone_number"
+     ]
+    },
+    {
+     "t_ms": 16100,
+     "actor": "agent",
+     "stage": "info",
+     "event": "gave_info",
+     "ok": true,
+     "slots": [
+      "phone_number"
+     ]
+    },
+    {
+     "t_ms": 18600,
+     "actor": "caller",
+     "stage": "info",
+     "event": "asked_info",
+     "ok": true,
+     "slots": [
+      "street_address"
+     ]
+    },
+    {
+     "t_ms": 21100,
+     "actor": "agent",
+     "stage": "info",
+     "event": "gave_info",
+     "ok": true,
+     "slots": [
+      "street_address"
+     ]
+    },
+    {
+     "t_ms": 24560,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 24610,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "asked_for_alternatives",
+     "ok": true
+    },
+    {
+     "t_ms": 28660,
+     "actor": "tool",
+     "stage": "discovery",
+     "event": "search_providers",
+     "ok": true,
+     "tool": "find_provider",
+     "n_results": 10
+    },
+    {
+     "t_ms": 30210,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_provider",
+     "ok": true,
+     "slots": [
+      "stylist_name",
+      "city"
+     ]
+    },
+    {
+     "t_ms": 30260,
+     "actor": "agent",
+     "stage": "discovery",
+     "event": "gave_result_count",
+     "ok": true
+    },
+    {
+     "t_ms": 35000,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "is_unisex"
+     ]
+    },
+    {
+     "t_ms": 35050,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "asked_for_alternatives",
+     "ok": true
+    },
+    {
+     "t_ms": 38140,
+     "actor": "tool",
+     "stage": "discovery",
+     "event": "search_providers",
+     "ok": true,
+     "tool": "find_provider",
+     "n_results": 9
+    },
+    {
+     "t_ms": 39690,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_provider",
+     "ok": true,
+     "slots": [
+      "stylist_name",
+      "city"
+     ]
+    },
+    {
+     "t_ms": 39740,
+     "actor": "agent",
+     "stage": "discovery",
+     "event": "gave_result_count",
+     "ok": true
+    },
+    {
+     "t_ms": 44160,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "selected_offer",
+     "ok": true
+    },
+    {
+     "t_ms": 46340,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_to_book",
+     "ok": true
+    },
+    {
+     "t_ms": 49800,
+     "actor": "caller",
+     "stage": "details",
+     "event": "accepted_booking_offer",
+     "ok": true
+    },
+    {
+     "t_ms": 49850,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_time"
+     ]
+    },
+    {
+     "t_ms": 53900,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 57360,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_date",
+      "appointment_time"
+     ]
+    },
+    {
+     "t_ms": 60180,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "stylist_name",
+      "appointment_time",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 66520,
+     "actor": "caller",
+     "stage": "info",
+     "event": "asked_info",
+     "ok": true,
+     "slots": [
+      "average_rating",
+      "street_address"
+     ]
+    },
+    {
+     "t_ms": 66570,
+     "actor": "caller",
+     "stage": "confirm",
+     "event": "affirmed",
+     "ok": true
+    },
+    {
+     "t_ms": 72220,
+     "actor": "tool",
+     "stage": "booking",
+     "event": "create_appointment",
+     "ok": true,
+     "tool": "book"
+    },
+    {
+     "t_ms": 73770,
+     "actor": "agent",
+     "stage": "info",
+     "event": "gave_info",
+     "ok": true,
+     "slots": [
+      "street_address",
+      "average_rating"
+     ]
+    },
+    {
+     "t_ms": 73820,
+     "actor": "agent",
+     "stage": "booking",
+     "event": "booking_confirmed",
+     "ok": true
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.96
+   }
+  },
+  "usage": {
+   "input_tokens": 2205,
+   "output_tokens": 21,
+   "cost": 9.261e-05
+  },
+  "id": "gen-dec-1790964817-uIW6m2Bwy9RTFEL1qNaR",
+  "provider": "TypeSafe"
+ }
+}

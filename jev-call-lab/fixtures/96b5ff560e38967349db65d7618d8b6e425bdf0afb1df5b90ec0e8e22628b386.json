@@ -1,0 +1,233 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "Services_2",
+   "specialty": "dentist",
+   "forecast_after_event_index": 20,
+   "elapsed_ms": 44540,
+   "current_stage": "confirm",
+   "current_event": "readback_details",
+   "fail_count_so_far": 3,
+   "tool_calls_so_far": 2,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 400,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "stated_intent_find",
+     "ok": true
+    },
+    {
+     "t_ms": 3220,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 6360,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 9180,
+     "actor": "tool",
+     "stage": "discovery",
+     "event": "search_providers",
+     "ok": true,
+     "tool": "find_provider",
+     "n_results": 7
+    },
+    {
+     "t_ms": 10730,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_provider",
+     "ok": true,
+     "slots": [
+      "dentist_name",
+      "city"
+     ]
+    },
+    {
+     "t_ms": 12320,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_time",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 12370,
+     "actor": "caller",
+     "stage": "details",
+     "event": "stated_intent_book",
+     "ok": true
+    },
+    {
+     "t_ms": 12420,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "selected_offer",
+     "ok": true
+    },
+    {
+     "t_ms": 18340,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "dentist_name",
+      "appointment_time",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 24680,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 24730,
+     "actor": "caller",
+     "stage": "confirm",
+     "event": "declined",
+     "ok": false
+    },
+    {
+     "t_ms": 27820,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "appointment_time",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 32560,
+     "actor": "caller",
+     "stage": "info",
+     "event": "asked_info",
+     "ok": true,
+     "slots": [
+      "address",
+      "offers_cosmetic_services"
+     ]
+    },
+    {
+     "t_ms": 32610,
+     "actor": "caller",
+     "stage": "confirm",
+     "event": "affirmed",
+     "ok": true
+    },
+    {
+     "t_ms": 36020,
+     "actor": "tool",
+     "stage": "booking",
+     "event": "create_appointment",
+     "ok": false,
+     "tool": "book"
+    },
+    {
+     "t_ms": 37570,
+     "actor": "agent",
+     "stage": "booking",
+     "event": "booking_failed",
+     "ok": false
+    },
+    {
+     "t_ms": 37620,
+     "actor": "agent",
+     "stage": "wrapup",
+     "event": "asked_anything_else",
+     "ok": true
+    },
+    {
+     "t_ms": 39480,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_time"
+     ]
+    },
+    {
+     "t_ms": 39530,
+     "actor": "caller",
+     "stage": "details",
+     "event": "stated_intent_book",
+     "ok": true
+    },
+    {
+     "t_ms": 44540,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "dentist_name",
+      "appointment_time",
+      "appointment_date"
+     ]
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.33
+   }
+  },
+  "usage": {
+   "input_tokens": 1587,
+   "output_tokens": 21,
+   "cost": 6.6654e-05
+  },
+  "id": "gen-dec-1790964797-xUSIRkCmt7Iu13pj7qd1",
+  "provider": "TypeSafe"
+ }
+}

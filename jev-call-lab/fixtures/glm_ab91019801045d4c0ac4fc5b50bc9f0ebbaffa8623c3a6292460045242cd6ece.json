@@ -1,0 +1,131 @@
+{
+ "request": {
+  "model": "z-ai/glm-5.3",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "west-clinic",
+   "specialty": "dermatology",
+   "forecast_after_event_index": 5,
+   "elapsed_ms": 19435,
+   "current_stage": "availability",
+   "current_event": "searched_open_slots",
+   "fail_count_so_far": 0,
+   "tool_calls_so_far": 2,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 2170,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "asked_dob_and_name",
+     "ok": true
+    },
+    {
+     "t_ms": 6749,
+     "actor": "caller",
+     "stage": "identity",
+     "event": "provided_identifiers",
+     "ok": true
+    },
+    {
+     "t_ms": 11147,
+     "actor": "tool",
+     "stage": "identity",
+     "event": "ehr_patient_lookup",
+     "ok": true,
+     "tool": "find_patient"
+    },
+    {
+     "t_ms": 15840,
+     "actor": "agent",
+     "stage": "intent",
+     "event": "confirmed_new_appointment",
+     "ok": true
+    },
+    {
+     "t_ms": 19435,
+     "actor": "tool",
+     "stage": "availability",
+     "event": "searched_open_slots",
+     "ok": true,
+     "tool": "search_slots",
+     "n_results": 5
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "usage": {
+  "prompt_tokens": 441,
+  "completion_tokens": 19,
+  "total_tokens": 460,
+  "cost": 0.000346995,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.0003505,
+   "upstream_inference_prompt_cost": 0.0003087,
+   "upstream_inference_completions_cost": 4.18e-05
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ },
+ "response": {
+  "model": "z-ai/glm-5.3",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.85
+   }
+  },
+  "usage": {
+   "prompt_tokens": 441,
+   "completion_tokens": 19,
+   "total_tokens": 460,
+   "cost": 0.000346995,
+   "is_byok": false,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cache_write_tokens": 0,
+    "audio_tokens": 0,
+    "video_tokens": 0
+   },
+   "cost_details": {
+    "upstream_inference_cost": 0.0003505,
+    "upstream_inference_prompt_cost": 0.0003087,
+    "upstream_inference_completions_cost": 4.18e-05
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 0,
+    "image_tokens": 0,
+    "audio_tokens": 0
+   },
+   "input_tokens": 441,
+   "output_tokens": 19
+  }
+ }
+}

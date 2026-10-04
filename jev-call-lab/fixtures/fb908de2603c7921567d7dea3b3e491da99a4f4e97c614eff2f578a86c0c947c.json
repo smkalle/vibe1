@@ -1,0 +1,107 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "Services_1",
+   "specialty": "salon",
+   "forecast_after_event_index": 6,
+   "elapsed_ms": 12060,
+   "current_stage": "discovery",
+   "current_event": "gave_result_count",
+   "fail_count_so_far": 0,
+   "tool_calls_so_far": 1,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 400,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "stated_intent_find",
+     "ok": true
+    },
+    {
+     "t_ms": 4180,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 6680,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "city",
+      "is_unisex"
+     ]
+    },
+    {
+     "t_ms": 10460,
+     "actor": "tool",
+     "stage": "discovery",
+     "event": "search_providers",
+     "ok": true,
+     "tool": "find_provider",
+     "n_results": 10
+    },
+    {
+     "t_ms": 12010,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_provider",
+     "ok": true,
+     "slots": [
+      "stylist_name",
+      "city"
+     ]
+    },
+    {
+     "t_ms": 12060,
+     "actor": "agent",
+     "stage": "discovery",
+     "event": "gave_result_count",
+     "ok": true
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.42
+   }
+  },
+  "usage": {
+   "input_tokens": 842,
+   "output_tokens": 21,
+   "cost": 3.5364e-05
+  },
+  "id": "gen-dec-1790964716-PDtFFQ4InwAJ0xNKHpRA",
+  "provider": "TypeSafe"
+ }
+}

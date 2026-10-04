@@ -1,0 +1,153 @@
+{
+ "request": {
+  "model": "z-ai/glm-5.3",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "north-clinic",
+   "specialty": "pediatrics",
+   "forecast_after_event_index": 8,
+   "elapsed_ms": 24460,
+   "current_stage": "booking",
+   "current_event": "create_appointment",
+   "fail_count_so_far": 1,
+   "tool_calls_so_far": 3,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 2101,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "asked_dob_and_name",
+     "ok": true
+    },
+    {
+     "t_ms": 6892,
+     "actor": "caller",
+     "stage": "identity",
+     "event": "provided_identifiers",
+     "ok": true
+    },
+    {
+     "t_ms": 10128,
+     "actor": "tool",
+     "stage": "identity",
+     "event": "ehr_patient_lookup",
+     "ok": true,
+     "tool": "find_patient"
+    },
+    {
+     "t_ms": 13832,
+     "actor": "agent",
+     "stage": "intent",
+     "event": "confirmed_new_appointment",
+     "ok": true
+    },
+    {
+     "t_ms": 15839,
+     "actor": "tool",
+     "stage": "availability",
+     "event": "searched_open_slots",
+     "ok": true,
+     "tool": "search_slots",
+     "n_results": 3
+    },
+    {
+     "t_ms": 19168,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_two_slots",
+     "ok": true
+    },
+    {
+     "t_ms": 21659,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "accepted_slot",
+     "ok": true
+    },
+    {
+     "t_ms": 24460,
+     "actor": "tool",
+     "stage": "booking",
+     "event": "create_appointment",
+     "ok": false,
+     "tool": "book"
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "usage": {
+  "prompt_tokens": 516,
+  "completion_tokens": 24,
+  "total_tokens": 540,
+  "cost": 0.00040986,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.000414,
+   "upstream_inference_prompt_cost": 0.0003612,
+   "upstream_inference_completions_cost": 5.28e-05
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ },
+ "response": {
+  "model": "z-ai/glm-5.3",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.75
+   }
+  },
+  "usage": {
+   "prompt_tokens": 516,
+   "completion_tokens": 24,
+   "total_tokens": 540,
+   "cost": 0.00040986,
+   "is_byok": false,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cache_write_tokens": 0,
+    "audio_tokens": 0,
+    "video_tokens": 0
+   },
+   "cost_details": {
+    "upstream_inference_cost": 0.000414,
+    "upstream_inference_prompt_cost": 0.0003612,
+    "upstream_inference_completions_cost": 5.28e-05
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 0,
+    "image_tokens": 0,
+    "audio_tokens": 0
+   },
+   "input_tokens": 516,
+   "output_tokens": 24
+  }
+ }
+}

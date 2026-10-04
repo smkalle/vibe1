@@ -1,0 +1,128 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "west-clinic",
+   "specialty": "cardiology",
+   "forecast_after_event_index": 10,
+   "elapsed_ms": 38058,
+   "current_stage": "booking",
+   "current_event": "create_appointment",
+   "fail_count_so_far": 0,
+   "tool_calls_so_far": 4,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 3786,
+     "actor": "agent",
+     "stage": "identity",
+     "event": "asked_dob_and_name",
+     "ok": true
+    },
+    {
+     "t_ms": 7315,
+     "actor": "caller",
+     "stage": "identity",
+     "event": "provided_identifiers",
+     "ok": true
+    },
+    {
+     "t_ms": 11067,
+     "actor": "tool",
+     "stage": "identity",
+     "event": "ehr_patient_lookup",
+     "ok": true,
+     "tool": "find_patient"
+    },
+    {
+     "t_ms": 16392,
+     "actor": "agent",
+     "stage": "intent",
+     "event": "confirmed_new_appointment",
+     "ok": true
+    },
+    {
+     "t_ms": 20641,
+     "actor": "tool",
+     "stage": "availability",
+     "event": "searched_open_slots",
+     "ok": true,
+     "tool": "search_slots",
+     "n_results": 5
+    },
+    {
+     "t_ms": 23474,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_two_slots",
+     "ok": true
+    },
+    {
+     "t_ms": 28473,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "asked_for_later_week",
+     "ok": true
+    },
+    {
+     "t_ms": 32319,
+     "actor": "tool",
+     "stage": "availability",
+     "event": "searched_open_slots",
+     "ok": true,
+     "tool": "search_slots",
+     "n_results": 3
+    },
+    {
+     "t_ms": 34886,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "accepted_slot",
+     "ok": true
+    },
+    {
+     "t_ms": 38058,
+     "actor": "tool",
+     "stage": "booking",
+     "event": "create_appointment",
+     "ok": true,
+     "tool": "book"
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.9
+   }
+  },
+  "usage": {
+   "input_tokens": 1017,
+   "output_tokens": 21,
+   "cost": 4.2714e-05
+  },
+  "id": "gen-dec-1790964739-Q6qpqvVD1eZplSwR2XJc",
+  "provider": "TypeSafe"
+ }
+}

@@ -1,0 +1,345 @@
+{
+ "request": {
+  "model": "z-ai/glm-5.3",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "Services_2",
+   "specialty": "dentist",
+   "forecast_after_event_index": 28,
+   "elapsed_ms": 94770,
+   "current_stage": "booking",
+   "current_event": "booking_failed",
+   "fail_count_so_far": 5,
+   "tool_calls_so_far": 3,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 400,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "stated_intent_find",
+     "ok": true
+    },
+    {
+     "t_ms": 3860,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 8280,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 11420,
+     "actor": "tool",
+     "stage": "discovery",
+     "event": "search_providers",
+     "ok": true,
+     "tool": "find_provider",
+     "n_results": 9
+    },
+    {
+     "t_ms": 12970,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_provider",
+     "ok": true,
+     "slots": [
+      "dentist_name",
+      "city"
+     ]
+    },
+    {
+     "t_ms": 15840,
+     "actor": "caller",
+     "stage": "info",
+     "event": "asked_info",
+     "ok": true,
+     "slots": [
+      "address"
+     ]
+    },
+    {
+     "t_ms": 18020,
+     "actor": "agent",
+     "stage": "info",
+     "event": "gave_info",
+     "ok": true,
+     "slots": [
+      "address"
+     ]
+    },
+    {
+     "t_ms": 20840,
+     "actor": "caller",
+     "stage": "info",
+     "event": "asked_info",
+     "ok": true,
+     "slots": [
+      "offers_cosmetic_services",
+      "phone_number"
+     ]
+    },
+    {
+     "t_ms": 25900,
+     "actor": "agent",
+     "stage": "info",
+     "event": "gave_info",
+     "ok": true,
+     "slots": [
+      "offers_cosmetic_services",
+      "phone_number"
+     ]
+    },
+    {
+     "t_ms": 31920,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "selected_offer",
+     "ok": true
+    },
+    {
+     "t_ms": 36020,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_to_book",
+     "ok": true
+    },
+    {
+     "t_ms": 39480,
+     "actor": "caller",
+     "stage": "details",
+     "event": "accepted_booking_offer",
+     "ok": true
+    },
+    {
+     "t_ms": 41980,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "appointment_time",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 47040,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_date",
+      "appointment_time"
+     ]
+    },
+    {
+     "t_ms": 52100,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "dentist_name",
+      "appointment_time",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 59400,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 59450,
+     "actor": "caller",
+     "stage": "confirm",
+     "event": "declined",
+     "ok": false
+    },
+    {
+     "t_ms": 62860,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "dentist_name",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 68880,
+     "actor": "caller",
+     "stage": "confirm",
+     "event": "affirmed",
+     "ok": true
+    },
+    {
+     "t_ms": 71060,
+     "actor": "tool",
+     "stage": "booking",
+     "event": "create_appointment",
+     "ok": false,
+     "tool": "book"
+    },
+    {
+     "t_ms": 72610,
+     "actor": "agent",
+     "stage": "booking",
+     "event": "booking_failed",
+     "ok": false
+    },
+    {
+     "t_ms": 72660,
+     "actor": "agent",
+     "stage": "wrapup",
+     "event": "asked_anything_else",
+     "ok": true
+    },
+    {
+     "t_ms": 79320,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_time"
+     ]
+    },
+    {
+     "t_ms": 79370,
+     "actor": "caller",
+     "stage": "details",
+     "event": "stated_intent_book",
+     "ok": true
+    },
+    {
+     "t_ms": 83420,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "dentist_name",
+      "appointment_time",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 90720,
+     "actor": "caller",
+     "stage": "confirm",
+     "event": "affirmed",
+     "ok": true
+    },
+    {
+     "t_ms": 93220,
+     "actor": "tool",
+     "stage": "booking",
+     "event": "create_appointment",
+     "ok": false,
+     "tool": "book"
+    },
+    {
+     "t_ms": 94770,
+     "actor": "agent",
+     "stage": "booking",
+     "event": "booking_failed",
+     "ok": false
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "usage": {
+  "prompt_tokens": 1124,
+  "completion_tokens": 52,
+  "total_tokens": 1176,
+  "cost": 0.000892188,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.0009012,
+   "upstream_inference_prompt_cost": 0.0007868,
+   "upstream_inference_completions_cost": 0.0001144
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 28,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ },
+ "response": {
+  "model": "z-ai/glm-5.3",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.25
+   }
+  },
+  "usage": {
+   "prompt_tokens": 1124,
+   "completion_tokens": 52,
+   "total_tokens": 1176,
+   "cost": 0.000892188,
+   "is_byok": false,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cache_write_tokens": 0,
+    "audio_tokens": 0,
+    "video_tokens": 0
+   },
+   "cost_details": {
+    "upstream_inference_cost": 0.0009012,
+    "upstream_inference_prompt_cost": 0.0007868,
+    "upstream_inference_completions_cost": 0.0001144
+   },
+   "completion_tokens_details": {
+    "reasoning_tokens": 28,
+    "image_tokens": 0,
+    "audio_tokens": 0
+   },
+   "input_tokens": 1124,
+   "output_tokens": 52
+  }
+ }
+}

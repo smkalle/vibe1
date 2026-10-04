@@ -1,0 +1,497 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "Services_2",
+   "specialty": "dentist",
+   "forecast_after_event_index": 42,
+   "elapsed_ms": 96180,
+   "current_stage": "complete",
+   "current_event": "call_ended",
+   "fail_count_so_far": 5,
+   "tool_calls_so_far": 4,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 400,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "stated_intent_find",
+     "ok": true
+    },
+    {
+     "t_ms": 4180,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 6360,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 9500,
+     "actor": "tool",
+     "stage": "discovery",
+     "event": "search_providers",
+     "ok": true,
+     "tool": "find_provider",
+     "n_results": 10
+    },
+    {
+     "t_ms": 11050,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_provider",
+     "ok": true,
+     "slots": [
+      "dentist_name",
+      "city"
+     ]
+    },
+    {
+     "t_ms": 11100,
+     "actor": "agent",
+     "stage": "discovery",
+     "event": "gave_result_count",
+     "ok": true
+    },
+    {
+     "t_ms": 13920,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "city"
+     ]
+    },
+    {
+     "t_ms": 13970,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "asked_for_alternatives",
+     "ok": true
+    },
+    {
+     "t_ms": 16740,
+     "actor": "tool",
+     "stage": "discovery",
+     "event": "search_providers",
+     "ok": true,
+     "tool": "find_provider",
+     "n_results": 10
+    },
+    {
+     "t_ms": 18290,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_provider",
+     "ok": true,
+     "slots": [
+      "dentist_name",
+      "city"
+     ]
+    },
+    {
+     "t_ms": 18340,
+     "actor": "agent",
+     "stage": "discovery",
+     "event": "gave_result_count",
+     "ok": true
+    },
+    {
+     "t_ms": 20840,
+     "actor": "caller",
+     "stage": "info",
+     "event": "asked_info",
+     "ok": true,
+     "slots": [
+      "address"
+     ]
+    },
+    {
+     "t_ms": 22700,
+     "actor": "agent",
+     "stage": "info",
+     "event": "gave_info",
+     "ok": true,
+     "slots": [
+      "address"
+     ]
+    },
+    {
+     "t_ms": 26800,
+     "actor": "caller",
+     "stage": "info",
+     "event": "asked_info",
+     "ok": true,
+     "slots": [
+      "offers_cosmetic_services",
+      "phone_number"
+     ]
+    },
+    {
+     "t_ms": 30260,
+     "actor": "agent",
+     "stage": "info",
+     "event": "gave_info",
+     "ok": true,
+     "slots": [
+      "offers_cosmetic_services",
+      "phone_number"
+     ]
+    },
+    {
+     "t_ms": 32760,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "asked_for_alternatives",
+     "ok": true
+    },
+    {
+     "t_ms": 35260,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_provider",
+     "ok": true,
+     "slots": [
+      "dentist_name",
+      "city"
+     ]
+    },
+    {
+     "t_ms": 40320,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "selected_offer",
+     "ok": true
+    },
+    {
+     "t_ms": 42500,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_to_book",
+     "ok": true
+    },
+    {
+     "t_ms": 45640,
+     "actor": "caller",
+     "stage": "details",
+     "event": "accepted_booking_offer",
+     "ok": true
+    },
+    {
+     "t_ms": 48140,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "appointment_time",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 50640,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_date",
+      "appointment_time"
+     ]
+    },
+    {
+     "t_ms": 54100,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "dentist_name",
+      "appointment_time",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 61080,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_time"
+     ]
+    },
+    {
+     "t_ms": 61130,
+     "actor": "caller",
+     "stage": "confirm",
+     "event": "declined",
+     "ok": false
+    },
+    {
+     "t_ms": 63580,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "dentist_name",
+      "appointment_time"
+     ]
+    },
+    {
+     "t_ms": 69280,
+     "actor": "caller",
+     "stage": "info",
+     "event": "asked_info",
+     "ok": true,
+     "slots": [
+      "offers_cosmetic_services",
+      "phone_number"
+     ]
+    },
+    {
+     "t_ms": 69330,
+     "actor": "caller",
+     "stage": "confirm",
+     "event": "affirmed",
+     "ok": true
+    },
+    {
+     "t_ms": 73380,
+     "actor": "tool",
+     "stage": "booking",
+     "event": "create_appointment",
+     "ok": false,
+     "tool": "book"
+    },
+    {
+     "t_ms": 74930,
+     "actor": "agent",
+     "stage": "booking",
+     "event": "booking_failed",
+     "ok": false
+    },
+    {
+     "t_ms": 74980,
+     "actor": "agent",
+     "stage": "wrapup",
+     "event": "asked_anything_else",
+     "ok": true
+    },
+    {
+     "t_ms": 75240,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 75290,
+     "actor": "caller",
+     "stage": "details",
+     "event": "stated_intent_book",
+     "ok": true
+    },
+    {
+     "t_ms": 79340,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "dentist_name",
+      "appointment_time",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 86000,
+     "actor": "caller",
+     "stage": "confirm",
+     "event": "affirmed",
+     "ok": true
+    },
+    {
+     "t_ms": 88500,
+     "actor": "tool",
+     "stage": "booking",
+     "event": "create_appointment",
+     "ok": false,
+     "tool": "book"
+    },
+    {
+     "t_ms": 90050,
+     "actor": "agent",
+     "stage": "booking",
+     "event": "booking_failed",
+     "ok": false
+    },
+    {
+     "t_ms": 90100,
+     "actor": "agent",
+     "stage": "wrapup",
+     "event": "asked_anything_else",
+     "ok": true
+    },
+    {
+     "t_ms": 90360,
+     "actor": "caller",
+     "stage": "wrapup",
+     "event": "nothing_else",
+     "ok": true
+    },
+    {
+     "t_ms": 90410,
+     "actor": "caller",
+     "stage": "wrapup",
+     "event": "thanked",
+     "ok": true
+    },
+    {
+     "t_ms": 92860,
+     "actor": "agent",
+     "stage": "wrapup",
+     "event": "said_goodbye",
+     "ok": true
+    },
+    {
+     "t_ms": 96180,
+     "actor": "system",
+     "stage": "complete",
+     "event": "call_ended",
+     "ok": true
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   },
+   "failure_mode": {
+    "type": "choice",
+    "instructions": "What is the dominant failure or success mode visible in the structure?",
+    "criteria": {
+     "clean_book": "Lookup, offer and booking all succeeded with little friction.",
+     "recovered_error": "An earlier tool, identity or booking failure was later overcome and the call booked.",
+     "identity_block": "Patient lookup or verification never succeeded.",
+     "no_availability": "Slot search or booking kept failing and the call stalled there.",
+     "info_only": "The caller only gathered information and never tried to book.",
+     "declined_offer": "The caller was offered a booking or slot and turned it down.",
+     "caller_drop": "Long silence, refusal, or hangup ended the call.",
+     "agent_loop": "Repeated stages or tools without forward progress.",
+     "other": "None of the above fits."
+    }
+   },
+   "agent_progress": {
+    "type": "score",
+    "instructions": "How far did the agent advance the scheduling workflow?",
+    "criteria": [
+     "Never got past greeting or identity",
+     "Reached intent or search but made no real offer",
+     "Offered a provider or slot but did not book",
+     "Completed a confirmed booking"
+    ]
+   },
+   "needs_human": {
+    "type": "noul",
+    "instructions": "Should a human receptionist have taken over, based on structure alone?",
+    "criteria": {
+     "true": "Stuck identity, refusal or silence, or repeated tool failure.",
+     "false": "The agent was still making workflow progress."
+    }
+   },
+   "visible_error_overweight": {
+    "type": "noul",
+    "instructions": "Does the trace contain an early visible error that a competent agent often recovers from (a failed lookup then retry, one failed booking then another slot)?"
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.05
+   },
+   "failure_mode": {
+    "type": "choice",
+    "choice": "no_availability",
+    "probabilities": {
+     "identity_block": 0,
+     "declined_offer": 0,
+     "caller_drop": 0,
+     "recovered_error": 0,
+     "agent_loop": 0.04,
+     "info_only": 0,
+     "clean_book": 0,
+     "no_availability": 0.96,
+     "other": 0
+    },
+    "confidence": 0.95
+   },
+   "agent_progress": {
+    "type": "score",
+    "score": 2,
+    "legend": {
+     "0": "Never got past greeting or identity",
+     "1": "Reached intent or search but made no real offer",
+     "2": "Offered a provider or slot but did not book",
+     "3": "Completed a confirmed booking"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0,
+     "2": 1,
+     "3": 0
+    },
+    "confidence": 0.99
+   },
+   "needs_human": {
+    "type": "noul",
+    "noul": 0.84
+   },
+   "visible_error_overweight": {
+    "type": "noul",
+    "noul": 0.82
+   }
+  },
+  "usage": {
+   "input_tokens": 3155,
+   "output_tokens": 171,
+   "cost": 0.00013251
+  },
+  "id": "gen-dec-1790964793-RJNEbmZHxamxRjKl9R7u",
+  "provider": "TypeSafe"
+ }
+}

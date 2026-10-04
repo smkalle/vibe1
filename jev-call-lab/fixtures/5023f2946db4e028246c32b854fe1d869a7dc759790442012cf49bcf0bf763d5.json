@@ -1,0 +1,351 @@
+{
+ "request": {
+  "model": "typesafe/jev-1.13",
+  "state": {
+   "task": "appointment_scheduling",
+   "site": "Services_4",
+   "specialty": "therapist",
+   "forecast_after_event_index": 33,
+   "elapsed_ms": 83450,
+   "current_stage": "booking",
+   "current_event": "booking_confirmed",
+   "fail_count_so_far": 3,
+   "tool_calls_so_far": 4,
+   "trace_so_far": [
+    {
+     "t_ms": 0,
+     "actor": "system",
+     "stage": "greeting",
+     "event": "call_started",
+     "ok": true
+    },
+    {
+     "t_ms": 400,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "stated_intent_find",
+     "ok": true
+    },
+    {
+     "t_ms": 3540,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "city",
+      "type"
+     ]
+    },
+    {
+     "t_ms": 9880,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "city",
+      "type"
+     ]
+    },
+    {
+     "t_ms": 13020,
+     "actor": "tool",
+     "stage": "discovery",
+     "event": "search_providers",
+     "ok": true,
+     "tool": "find_provider",
+     "n_results": 10
+    },
+    {
+     "t_ms": 14570,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_provider",
+     "ok": true,
+     "slots": [
+      "therapist_name",
+      "type",
+      "city"
+     ]
+    },
+    {
+     "t_ms": 14620,
+     "actor": "agent",
+     "stage": "discovery",
+     "event": "gave_result_count",
+     "ok": true
+    },
+    {
+     "t_ms": 17760,
+     "actor": "caller",
+     "stage": "info",
+     "event": "asked_info",
+     "ok": true,
+     "slots": [
+      "address"
+     ]
+    },
+    {
+     "t_ms": 19940,
+     "actor": "agent",
+     "stage": "info",
+     "event": "gave_info",
+     "ok": true,
+     "slots": [
+      "address"
+     ]
+    },
+    {
+     "t_ms": 23720,
+     "actor": "caller",
+     "stage": "info",
+     "event": "asked_info",
+     "ok": true,
+     "slots": [
+      "phone_number"
+     ]
+    },
+    {
+     "t_ms": 25900,
+     "actor": "agent",
+     "stage": "info",
+     "event": "gave_info",
+     "ok": true,
+     "slots": [
+      "phone_number"
+     ]
+    },
+    {
+     "t_ms": 28720,
+     "actor": "caller",
+     "stage": "discovery",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "city",
+      "type"
+     ]
+    },
+    {
+     "t_ms": 28770,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "asked_for_alternatives",
+     "ok": true
+    },
+    {
+     "t_ms": 33780,
+     "actor": "tool",
+     "stage": "discovery",
+     "event": "search_providers",
+     "ok": true,
+     "tool": "find_provider",
+     "n_results": 2
+    },
+    {
+     "t_ms": 35330,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_provider",
+     "ok": true,
+     "slots": [
+      "therapist_name",
+      "type",
+      "city"
+     ]
+    },
+    {
+     "t_ms": 38840,
+     "actor": "caller",
+     "stage": "offer",
+     "event": "selected_offer",
+     "ok": true
+    },
+    {
+     "t_ms": 40700,
+     "actor": "agent",
+     "stage": "offer",
+     "event": "offered_to_book",
+     "ok": true
+    },
+    {
+     "t_ms": 44480,
+     "actor": "caller",
+     "stage": "details",
+     "event": "accepted_booking_offer",
+     "ok": true
+    },
+    {
+     "t_ms": 46660,
+     "actor": "agent",
+     "stage": "details",
+     "event": "asked_for_info",
+     "ok": true,
+     "slots": [
+      "appointment_date",
+      "appointment_time"
+     ]
+    },
+    {
+     "t_ms": 49160,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_date",
+      "appointment_time"
+     ]
+    },
+    {
+     "t_ms": 53580,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "therapist_name",
+      "appointment_time",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 59600,
+     "actor": "caller",
+     "stage": "confirm",
+     "event": "affirmed",
+     "ok": true
+    },
+    {
+     "t_ms": 61460,
+     "actor": "tool",
+     "stage": "booking",
+     "event": "create_appointment",
+     "ok": false,
+     "tool": "book"
+    },
+    {
+     "t_ms": 63010,
+     "actor": "agent",
+     "stage": "booking",
+     "event": "booking_failed",
+     "ok": false
+    },
+    {
+     "t_ms": 63060,
+     "actor": "agent",
+     "stage": "wrapup",
+     "event": "asked_anything_else",
+     "ok": true
+    },
+    {
+     "t_ms": 65880,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_time"
+     ]
+    },
+    {
+     "t_ms": 65930,
+     "actor": "caller",
+     "stage": "details",
+     "event": "stated_intent_book",
+     "ok": true
+    },
+    {
+     "t_ms": 69660,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "therapist_name",
+      "appointment_time",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 74720,
+     "actor": "caller",
+     "stage": "details",
+     "event": "provided_info",
+     "ok": true,
+     "slots": [
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 74770,
+     "actor": "caller",
+     "stage": "confirm",
+     "event": "declined",
+     "ok": false
+    },
+    {
+     "t_ms": 77220,
+     "actor": "agent",
+     "stage": "confirm",
+     "event": "readback_details",
+     "ok": true,
+     "slots": [
+      "appointment_time",
+      "appointment_date"
+     ]
+    },
+    {
+     "t_ms": 80040,
+     "actor": "caller",
+     "stage": "confirm",
+     "event": "affirmed",
+     "ok": true
+    },
+    {
+     "t_ms": 81900,
+     "actor": "tool",
+     "stage": "booking",
+     "event": "create_appointment",
+     "ok": true,
+     "tool": "book"
+    },
+    {
+     "t_ms": 83450,
+     "actor": "agent",
+     "stage": "booking",
+     "event": "booking_confirmed",
+     "ok": true
+    }
+   ],
+   "note": "No audio or transcript is available. Judge from structure only."
+  },
+  "questions": {
+   "will_book": {
+    "type": "noul",
+    "instructions": "This state is a structural trace of an AI receptionist call that schedules appointments (clinic or service provider). There is no transcript. Will this call end with a booked appointment written to the scheduling system?",
+    "criteria": {
+     "true": "A slot will be confirmed and created before the call ends.",
+     "false": "The caller will leave without a booked appointment."
+    }
+   }
+  }
+ },
+ "response": {
+  "model": "typesafe/jev-1.13-20260917",
+  "answers": {
+   "will_book": {
+    "type": "noul",
+    "noul": 0.97
+   }
+  },
+  "usage": {
+   "input_tokens": 2301,
+   "output_tokens": 21,
+   "cost": 9.6642e-05
+  },
+  "id": "gen-dec-1790964705-vuAs1VSI45HGePxNn7N6",
+  "provider": "TypeSafe"
+ }
+}

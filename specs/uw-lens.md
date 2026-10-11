@@ -93,7 +93,7 @@ Sidecar `<file>.meta.json` (optional): `{title, source, language, caption, trans
 ## 5. UI
 
 - Sidebar: engine card (embedder, dims, modalities, chunks indexed), top-k, fusion mode/α, filters, group-by-file.
-- **Search**: query box, EN/JA example chips, image query (vision-capable embedder only), result cards with
+- **Search**: free-text question box plus a category drop-down with 3 sample questions per category (`uwlens/questions.py`), image query (vision-capable embedder only), result cards with
   modality badge, source/lang, scores, redacted snippet, inline preview (image/audio/video/PDF page), Pin button;
   optional "Research summary (local LLM)" with numbered citations.
 - **Index**: folder path, "Generate sample corpus", PHI redaction toggle, chunk size, modalities, Index/Rebuild,
@@ -130,3 +130,10 @@ Final state:
 - Acceptance A1–A8: met. A2 and A8 were verified offline: A2 with the lexical fallback, A8 with a recording fake model. Nobody has
   measured real EmbeddingGemma 2 retrieval quality here, because the CI sandbox can't reach Hugging Face. First thing to do on a
   machine with model access: `UWLENS_EMBEDDER=gemma python run_evals.py`.
+
+### Change 2026-10-11: sample-question categories
+Six categories with three sample questions each (EN and JA), shown as two drop-downs under the free-text box.
+They replace the example chips. Picking a sample copies it into the question box; typing your own question clears
+the pick. Verification: every sample's expected document ranks in the top 5 (all of them in the top 2 with the
+offline fallback); AppTest covers the category → question → results flow and the typed-question reset; tested by
+hand in Chromium. The suite now has 50 passing tests.

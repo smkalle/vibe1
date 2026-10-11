@@ -39,6 +39,7 @@ Run everything from inside `uw-lens/`.
 - CI job template: `uw-lens/ci-job.example.yml` (not yet in `.github/workflows/ci.yml`). Offline check: `python -m pytest -q tests` (autouse fixture forces `UWLENS_EMBEDDER=hashing` and tmp index/corpus dirs), then `python run_evals.py` -> `evals/REPORT.md`. Needs `ffmpeg` on PATH for the sample video (tests assert 19 corpus files).
 - Embedders: `auto` tries `google/embeddinggemma-2` and falls back to the lexical hashing embedder. The index manifest pins embedder id + dim; mismatch raises `EmbedderMismatch` (UI offers rebuild). The Gemma adapter's call contract is tested against `FakeST` in `tests/test_embedders.py`, so keep it in sync if the model card's prompt names change.
 - PHI redaction (`textproc.redact_phi`) runs before embedding; `tests/test_index_store.py::test_no_phi_in_stored_records` guards it. The sample corpus is synthetic (`corpus_src/`, rendered by `uwlens/sample_corpus.py`); `sample_corpus/` and `uwlens_index/` are gitignored.
+- Sample questions: `uwlens/questions.py` (category -> 3 questions, each with expected files). `test_every_sample_question_finds_its_document` fails if a sample stops retrieving its source, so update `expect` when you change the corpus. UI keys are `q_category` and `sample_q_<i>`.
 - RAG (`uwlens/rag.py`) is Ollama on localhost only, off by default; `is_local()` refuses remote URLs.
 - Streamlit gotchas: escape corpus text with `md()` in `app.py` (`$` renders as math, `5.`/`-` as lists); after indexing call `st.rerun()` so the sidebar counts refresh.
 

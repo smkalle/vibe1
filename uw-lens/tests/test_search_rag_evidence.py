@@ -129,3 +129,23 @@ def test_evidence_pack_exports(engine):
     assert len(rows) == 2 and rows[0]["note"] == "Meets 70% threshold" and rows[0]["case_ref"] == "UWR-17"
     pack.unpin(pack.items[0].id)
     assert len(pack.items) == 1
+
+
+# ------------------------------------------------------------------------------ sample questions
+def test_sample_question_categories_shape():
+    from uwlens.questions import CATEGORIES
+
+    assert len(CATEGORIES) >= 5
+    assert all(len(qs) == 3 for qs in CATEGORIES.values())
+    texts = [q.text for qs in CATEGORIES.values() for q in qs]
+    assert len(texts) == len(set(texts))
+    assert any(not t.isascii() for t in texts)  # Japanese samples included
+
+
+def test_every_sample_question_finds_its_document(engine):
+    from uwlens.questions import CATEGORIES
+
+    for cat, qs in CATEGORIES.items():
+        for q in qs:
+            top = names(engine.search(q.text, k=5))
+            assert set(top) & set(q.expect), (cat, q.text, top)

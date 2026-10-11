@@ -18,6 +18,7 @@ from uwlens.config import MATRYOSHKA_DIMS, MODALITY_PROFILES, Settings  # noqa: 
 from uwlens.embedders import load_embedder  # noqa: E402
 from uwlens.evidence import DISCLAIMER, EvidencePack, PinnedItem  # noqa: E402
 from uwlens.indexer import index_folder  # noqa: E402
+from uwlens.questions import CATEGORIES  # noqa: E402
 from uwlens.rag import answer as rag_answer  # noqa: E402
 from uwlens.search import Filters, SearchEngine  # noqa: E402
 from uwlens.store import EmbedderMismatch, open_store, reset_index  # noqa: E402
@@ -28,14 +29,7 @@ st.set_page_config(page_title="UW Lens", page_icon="🔎", layout="wide")
 ICON = {"text": "📄", "code": "🧩", "pdf": "📕", "image": "🖼️", "audio": "🎧", "video": "🎬"}
 SOURCE_LABEL = {"nih": "NIH-style clinical ref", "japan": "Japan public insurance", "policy": "Underwriting manual",
                 "case": "Case evidence", "other": "Other"}
-EXAMPLES = [
-    "CPAP compliance for moderate sleep apnea",
-    "HbA1c above 8% rating table",
-    "trend chart of HbA1c over time",
-    "高額療養費 自己負担限度額",
-    "メタボリックシンドロームの判定基準",
-    "告知義務違反 契約解除",
-]
+CATEGORY_NAMES = list(CATEGORIES)
 
 # ---------------------------------------------------------------------------------- state
 ss = st.session_state
@@ -112,9 +106,23 @@ def pdf_page_png(path: str, locator: str, mtime: float) -> bytes | None:
         return doc[page_no].get_pixmap(dpi=80).tobytes("png")
 
 
-def set_query(q: str):
-    ss.query = q
+def sample_key(category: str) -> str:
+    return f"sample_q_{CATEGORY_NAMES.index(category)}"
+
+
+def use_sample_question(key: str):
+    """Copy the picked sample question into the query box (runs before the script reruns)."""
+    if ss.get(key):
+        ss.query = ss[key]
+        ss.rag_result = None
+
+
+def on_query_typed():
+    """A typed question replaces any picked sample, so the drop-down never shows a stale choice."""
     ss.rag_result = None
+    for cat in CATEGORY_NAMES:
+        if ss.get(sample_key(cat)) not in (None, ss.query):
+            ss[sample_key(cat)] = None
 
 
 # ---------------------------------------------------------------------------------- sidebar
@@ -180,11 +188,13 @@ with tab_search:
     elif engine and not engine.records:
         st.info("The index is empty. Open the **📂 Index** tab to generate the sample corpus and index it.")
 
-    st.text_input("Ask in English or Japanese", key="query", placeholder="e.g. CPAP compliance for moderate sleep apnea",
-                  on_change=lambda: ss.update(rag_result=None))
-    cols = st.columns(len(EXAMPLES))
-    for col, ex in zip(cols, EXAMPLES):
-        col.button(ex, key=f"ex_{EXAMPLES.index(ex)}", on_click=set_query, args=(ex,), width="stretch")
+    st.text_input("Ask your own question about the corpus (English or Japanese)", key="query",
+                  placeholder="e.g. CPAP compliance for moderate sleep apnea", on_change=on_query_typed)
+    c_cat, c_q = st.columns([1, 2])
+    category = c_cat.selectbox("…or browse sample questions by category", CATEGORY_NAMES, key="q_category")
+    q_key = sample_key(category)
+    c_q.selectbox("Sample question", [q.text for q in CATEGORIES[category]], index=None, key=q_key,
+                  placeholder="Pick one of 3 sample questions…", on_change=use_sample_question, args=(q_key,))
 
     query_vector = None
     with st.expander("Search by example image"):

@@ -47,10 +47,14 @@ def test_full_workflow():
     res = _results(at)
     assert len(res) == 8 and any("sleep apnea" in r.lower() for r in res[:3])
 
-    # filter to Japanese sources, Japanese example query
-    at.button(key="ex_3").click().run()
+    # pick a category, then one of its 3 sample questions -> it becomes the query
+    at.selectbox(key="q_category").set_value("🇯🇵 Japan public insurance").run()
     _ok(at)
-    assert at.session_state["query"] == "高額療養費 自己負担限度額"
+    sample = at.selectbox(key="sample_q_3")
+    assert len(sample.options) == 3 and sample.value is None
+    sample.set_value("高額療養費の自己負担限度額はいくらですか？").run()
+    _ok(at)
+    assert at.session_state["query"] == "高額療養費の自己負担限度額はいくらですか？"
     assert "高額療養費制度の概要" in _results(at)[0]
     at.multiselect(key="f_src").set_value(["japan"]).run()
     _ok(at)
@@ -123,3 +127,14 @@ def test_rag_is_off_by_default_and_cites_when_on(fake_ollama):
     assert fake_ollama.seen and fake_ollama.seen[0]["stream"] is False
     page = " ".join(m.value for m in at.markdown)
     assert "Research summary" in page and "70% threshold" in page
+
+
+def test_own_question_clears_sample_pick():
+    at = _indexed_app()
+    at.selectbox(key="sample_q_0").set_value("What HbA1c level confirms a diabetes diagnosis?").run()
+    _ok(at)
+    assert at.session_state["query"] == "What HbA1c level confirms a diabetes diagnosis?"
+    at.text_input(key="query").set_value("asthma exacerbation intubation risk").run()
+    _ok(at)
+    assert at.selectbox(key="sample_q_0").value is None  # no stale sample shown next to a typed question
+    assert "Asthma" in _results(at)[0]

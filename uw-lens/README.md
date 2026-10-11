@@ -21,6 +21,8 @@ Everything runs on your machine.
 
 ![Search (English)](screenshots/search_en.png)
 
+![Sample question drop-downs](screenshots/sample_questions.png)
+
 | Japanese query | Evidence pack |
 |---|---|
 | ![JA](screenshots/search_ja.png) | ![Pack](screenshots/evidence.png) |
@@ -55,6 +57,7 @@ license on the model page and run `huggingface-cli login`. After that, nothing l
 | **Modalities** | `.txt .md` · code `.py .js .ts .sql .json .yaml` · `.pdf` (per page) · images · audio (30 s windows, 16 kHz mono) · video |
 | **Sidecars** | Optional `<file>.meta.json` with `title`, `source`, `language`, `caption`, `transcript`, `segments`, `tags`. These stand in for OCR/ASR, feed BM25, and let the offline fallback find media |
 | **Hybrid ranking** | Semantic cosine + BM25. Fusion modes: RRF (default), weighted, semantic-only, keyword-only. Optional per-modality z-normalization, because image/audio cosines run lower than text. One result per file |
+| **Asking questions** | Type your own question about the corpus, or pick a **category** (Diabetes & metabolic · Sleep apnea · Cardiovascular & kidney · Japan public insurance · Disclosure & underwriting rules · Case 0417 evidence) and then one of its **3 sample questions** (EN and JA). Samples live in `uwlens/questions.py`; a test checks that each one finds its source document in the top 5 |
 | **Bilingual** | NFKC normalization (ＨｂＡ１ｃ → HbA1c), CJK bigram tokens, language detection (en/ja/mixed), Japanese highlighting |
 | **Filters** | Modality, source (`nih` / `japan` / `policy` / `case`, from the folder name or sidecar), language |
 | **PHI redaction** | On by default and applied *before embedding*. Masks emails, phones (US/JP), SSN, My Number, member/policy/被保険者番号 IDs, labelled names (`Patient name:` / `氏名：`) and dates of birth. Clinical values (HbA1c, BP, dates of tests) are kept. The indexer re-scans stored text and warns about anything left over |
@@ -91,7 +94,7 @@ Use EmbeddingGemma 2 for real semantic, cross-modal and cross-lingual retrieval.
 ## Tests and evals
 
 ```bash
-python -m pytest -q tests     # 47 tests, fully offline (unit + Streamlit AppTest UI flows)
+python -m pytest -q tests     # 50 tests, fully offline (unit + Streamlit AppTest UI flows)
 python run_evals.py           # retrieval eval -> evals/REPORT.md
 UWLENS_EMBEDDER=gemma python run_evals.py   # same eval with EmbeddingGemma 2
 ```

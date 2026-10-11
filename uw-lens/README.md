@@ -47,8 +47,14 @@ python -m uwlens search "高額療養費 自己負担限度額" --source japan
 streamlit run app.py
 ```
 
-The first EmbeddingGemma 2 run downloads the model from Hugging Face. You may need to accept the Gemma
-license on the model page and run `huggingface-cli login`. After that, nothing leaves the machine.
+The first EmbeddingGemma 2 run downloads the model from Hugging Face. It's a gated model, so first accept
+the Gemma license on the [model page](https://huggingface.co/google/embeddinggemma-2). Then either:
+- paste a read token into the sidebar under **🤗 Hugging Face token**, or
+- set `HF_TOKEN`, or run `huggingface-cli login`.
+
+A token pasted in the sidebar lives only in that browser session's memory. UW Lens never writes it to disk,
+logs, the index or a cache key, and only a masked form (`hf_…1234`) is ever shown. **Forget token** clears it.
+After the download, nothing leaves the machine.
 
 ## What it does
 
@@ -94,7 +100,7 @@ Use EmbeddingGemma 2 for real semantic, cross-modal and cross-lingual retrieval.
 ## Tests and evals
 
 ```bash
-python -m pytest -q tests     # 50 tests, fully offline (unit + Streamlit AppTest UI flows)
+python -m pytest -q tests     # 57 tests, fully offline (unit + Streamlit AppTest UI flows)
 python run_evals.py           # retrieval eval -> evals/REPORT.md
 UWLENS_EMBEDDER=gemma python run_evals.py   # same eval with EmbeddingGemma 2
 ```

@@ -4,6 +4,7 @@ Run:  streamlit run app.py
 """
 from __future__ import annotations
 
+import hashlib
 import html
 import re
 import sys
@@ -15,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from uwlens import __version__  # noqa: E402
 from uwlens.config import MATRYOSHKA_DIMS, MODALITY_PROFILES, Settings  # noqa: E402
-from uwlens.embedders import load_embedder  # noqa: E402
+from uwlens.embedders import HashingEmbedder, describe_load_error, load_embedder  # noqa: E402
 from uwlens.evidence import DISCLAIMER, EvidencePack, PinnedItem  # noqa: E402
 from uwlens.indexer import index_folder  # noqa: E402
 from uwlens.questions import CATEGORIES  # noqa: E402
@@ -43,6 +44,7 @@ ss.setdefault("profile", base.modalities)
 ss.setdefault("dim", base.dim)
 ss.setdefault("index_dir", str(base.index_dir))
 ss.setdefault("corpus_dir", str(base.corpus_dir))
+ss.setdefault("hf_token", "")  # session memory only: never written to disk, logs or the index
 
 
 def md(text: str) -> str:
@@ -75,14 +77,42 @@ def highlight(snippet: str, query: str) -> str:
     return out
 
 
+def token_fingerprint(token: str) -> str:
+    """Cache key for a token: a short hash, so the secret itself is never a cache key."""
+    return hashlib.sha256(token.encode()).hexdigest()[:16] if token else ""
+
+
+def mask_token(token: str) -> str:
+    return f"{token[:3]}…{token[-4:]}" if len(token) > 10 else "•" * len(token)
+
+
 @st.cache_resource(show_spinner="Loading embedding model…")
-def get_embedder(choice: str, profile: str, dim: int):
-    return load_embedder(base.with_(embedder=choice, modalities=profile, dim=dim))
+def _load_embedder_cached(choice: str, profile: str, dim: int, token_fp: str, _token: str):
+    # `_token` is excluded from Streamlit's cache hashing (leading underscore); `token_fp` keys the cache
+    settings = base.with_(embedder=choice, modalities=profile, dim=dim, hf_token=_token or None)
+    try:
+        return load_embedder(settings)
+    except Exception as exc:  # explicit "gemma" mode: show the error instead of crashing the app
+        return HashingEmbedder(dim), (f"EmbeddingGemma 2 failed to load ({describe_load_error(exc, _token)}). "
+                                      "Using the offline hashing fallback.")
+
+
+def get_embedder():
+    return _load_embedder_cached(ss.embedder_choice, ss.profile, ss.dim, token_fingerprint(ss.hf_token), ss.hf_token)
+
+
+def set_hf_token():
+    ss.hf_token = (ss.get("hf_token_input") or "").strip()
+    ss.hf_token_input = ""  # don't keep the secret in the widget either
+
+
+def forget_hf_token():
+    ss.hf_token = ""
 
 
 def get_engine():
     """(engine | None, error | None). The engine is cached per index version in session state."""
-    embedder, _ = get_embedder(ss.embedder_choice, ss.profile, ss.dim)
+    embedder, _ = get_embedder()
     key = (embedder.id, ss.index_dir, base.store, ss.index_version)
     if ss.get("_engine_key") != key:
         try:
@@ -126,7 +156,7 @@ def on_query_typed():
 
 
 # ---------------------------------------------------------------------------------- sidebar
-embedder, embed_status = get_embedder(ss.embedder_choice, ss.profile, ss.dim)
+embedder, embed_status = get_embedder()
 engine, engine_error = get_engine()
 
 with st.sidebar:
@@ -141,6 +171,22 @@ with st.sidebar:
             c1, c2 = st.columns(2)
             c1.metric("Files", files)
             c2.metric("Chunks", len(engine.records))
+    gemma_active = not isinstance(embedder, HashingEmbedder)
+    with st.expander("🤗 Hugging Face token", expanded=not gemma_active):
+        st.caption("EmbeddingGemma 2 is a gated model: accept its license on "
+                   "[huggingface.co/google/embeddinggemma-2](https://huggingface.co/google/embeddinggemma-2), then "
+                   "paste a **read** token from [your settings](https://huggingface.co/settings/tokens).")
+        st.text_input("Access token", key="hf_token_input", type="password", placeholder="hf_…",
+                      on_change=set_hf_token, help="Kept in this browser session's memory only. Never saved to disk, "
+                      "logs or the index. HF_TOKEN / `huggingface-cli login` also work.")
+        if ss.hf_token:
+            if not ss.hf_token.startswith("hf_"):
+                st.warning("Hugging Face tokens usually start with `hf_`.", icon="⚠️")
+            st.success(f"Token active for this session: `{mask_token(ss.hf_token)}`", icon="🔑")
+            st.button("Forget token", key="hf_forget", on_click=forget_hf_token)
+            if ss.embedder_choice == "hashing":
+                st.info("The embedder is set to `hashing`, so the token isn't used. Choose `auto` or `gemma` "
+                        "under Engine settings.")
     with st.expander("Engine settings"):
         st.selectbox("Embedder", ["auto", "gemma", "hashing"], key="embedder_choice",
                      help="auto = EmbeddingGemma 2 if it loads, else the offline hashing fallback.")

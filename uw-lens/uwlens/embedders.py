@@ -123,7 +123,8 @@ class GemmaEmbedder:
         elif settings.modalities == "vision":
             config_kwargs = {"audio_config": None}
         log.info("loading %s (%s)", settings.model_id, settings.modalities)
-        return SentenceTransformer(settings.model_id, model_kwargs=model_kwargs, config_kwargs=config_kwargs)
+        extra = {"token": settings.hf_token} if settings.hf_token else {}
+        return SentenceTransformer(settings.model_id, model_kwargs=model_kwargs, config_kwargs=config_kwargs, **extra)
 
     def _encode(self, inputs, prompt_name=None) -> np.ndarray:
         kwargs = {"normalize_embeddings": True, "convert_to_numpy": True}
@@ -159,6 +160,23 @@ def _pick(prompts: dict, names: Sequence[str]) -> str | None:
     return None
 
 
+def redact_token(text: str, token: str | None) -> str:
+    return text.replace(token, "hf_***") if token else text
+
+
+def describe_load_error(exc: Exception, token: str | None = None) -> str:
+    """One-line, token-free reason, with a hint for the common gated-model auth failures."""
+    first = str(exc).splitlines()[0][:200] if str(exc) else ""
+    reason = redact_token(f"{type(exc).__name__}: {first}", token)
+    low = str(exc).lower()
+    if isinstance(exc, ImportError):
+        return reason + " — install the model dependencies: pip install -r requirements-gemma.txt"
+    if any(s in low for s in ("401", "403", "gated", "unauthorized", "access to model", "restricted")):
+        reason += (" — check the Hugging Face token and accept the Gemma license on the model page"
+                   if token else " — paste a Hugging Face token in the sidebar and accept the Gemma license")
+    return reason
+
+
 def load_embedder(settings: Settings) -> tuple[Embedder, str]:
     """Return (embedder, status message). `auto` falls back to hashing if Gemma can't load."""
     if settings.embedder == "hashing":
@@ -169,7 +187,7 @@ def load_embedder(settings: Settings) -> tuple[Embedder, str]:
     except Exception as exc:  # ImportError, network, auth, OOM ...
         if settings.embedder == "gemma":
             raise
-        reason = f"{type(exc).__name__}: {str(exc).splitlines()[0][:200] if str(exc) else ''}"
+        reason = describe_load_error(exc, settings.hf_token)
         log.warning("EmbeddingGemma 2 unavailable, falling back to hashing: %s", reason)
         return (
             HashingEmbedder(settings.dim),

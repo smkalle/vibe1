@@ -31,6 +31,10 @@ class Settings:
     audio_window_s: float = field(default_factory=lambda: float(_env("UWLENS_AUDIO_WINDOW_S", "30")))
     ollama_url: str = field(default_factory=lambda: _env("OLLAMA_URL", "http://localhost:11434"))
     ollama_model: str = field(default_factory=lambda: _env("OLLAMA_MODEL", "gemma3:4b"))
+    # Hugging Face access token for the gated model download. Never read from or written to disk by
+    # UW Lens (huggingface_hub still honours HF_TOKEN / `huggingface-cli login` on its own); kept out
+    # of repr and equality so it can't leak into logs or cache keys.
+    hf_token: str | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self):
         if self.dim not in MATRYOSHKA_DIMS:

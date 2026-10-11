@@ -56,6 +56,89 @@ A token pasted in the sidebar lives only in that browser session's memory. UW Le
 logs, the index or a cache key, and only a masked form (`hf_…1234`) is ever shown. **Forget token** clears it.
 After the download, nothing leaves the machine.
 
+## About EmbeddingGemma 2
+
+UW Lens's semantic search is built on **EmbeddingGemma 2**, an open embedding model from Google DeepMind,
+released on 6 October 2026. An *embedding model* turns an input into a list of numbers (a vector) so that
+inputs with similar meaning end up close together. EmbeddingGemma 2 does this for **text, code, images,
+audio and video in one shared space**. That shared space is what lets a typed question find a scanned lab
+report, an interview recording or a short video.
+
+### Key facts
+
+| | |
+|---|---|
+| **Publisher / license** | Google DeepMind · Apache 2.0 (open weights on Hugging Face as `google/embeddinggemma-2`, and on Kaggle) |
+| **Size** | 740M parameters in total: a 270M text/code core, plus an optional 170M vision encoder and an optional 300M audio encoder |
+| **Output** | 768-dimensional vectors. Matryoshka training means you can keep just the first 512, 256 or 128 numbers and still get usable vectors |
+| **Context** | 8,192 tokens, shared by all modalities in one input |
+| **Inputs** | Text, code, images, audio and video, alone or interleaved in one input (placeholders such as `<\|image\|>` mark where media go) |
+| **Prompts** | Text uses task prompts. Queries use `SearchQuery` and indexed content uses `Document`. Media are encoded without a prompt |
+| **Footprint** | Google reports about 191 MB of active RAM for text-only and about 567 MB for the full multimodal model, quantized on a phone (Pixel 11 Pro) |
+| **Runtimes** | sentence-transformers / Transformers. Ollama, vLLM and MLX support has also been reported |
+
+### Modular loading
+
+The encoders load only when needed, and every configuration writes into the **same** vector space. A
+text-only query therefore matches an image that was indexed with the full model.
+
+| Configuration | Parameters | UW Lens setting (`UWLENS_MODALITIES`) | Good for |
+|---|---|---|---|
+| Text only | ≈270M | `text` | PDFs, notes, manuals, code; lowest memory |
+| Text + vision | ≈440M | `vision` | Adds scanned reports, charts, screenshots and video frames |
+| Text + audio | ≈570M | *(not exposed yet)* | Audio without images |
+| Full | ≈740M | `full` (default) | All modalities |
+
+With the `text` setting, UW Lens embeds each image's or recording's sidecar caption or transcript instead
+of its pixels or sound. Those files stay searchable, just not by what they look or sound like.
+
+### How UW Lens uses it
+
+- **Asymmetric prompts.** Your question is encoded with `SearchQuery`. Indexed text and PDF pages use
+  `Document`, and code uses `CodeRetrieval` when the model defines that prompt.
+- **Media as dictionaries.** Media are passed as `{"image": path}`, `{"video": path}` or `{"audio": array}`.
+  Audio is cut into 30-second windows of 16 kHz mono so long recordings stay inside the 8K-token context.
+- **Normalized vectors.** Every vector is normalized to unit length, so cosine similarity is a dot product.
+  When you pick a smaller Matryoshka size (`UWLENS_DIM`), vectors are truncated and then normalized again.
+- **Precision.** UW Lens uses bfloat16 on GPUs that support it, otherwise float32, and never float16, which
+  can produce NaNs. A NaN guard rejects bad vectors.
+- **Index pinning.** The index records the model and dimension it was built with. Switching either one asks
+  for a rebuild instead of silently mixing incomparable vectors.
+- **Hybrid ranking.** The semantic score is fused with BM25 keyword matching, because embeddings can miss
+  exact identifiers such as drug names, ICD-style codes or table names.
+
+### Getting access
+
+The model is **gated**: accept the Gemma license on its
+[Hugging Face page](https://huggingface.co/google/embeddinggemma-2) first, then authenticate in any one of
+these ways:
+- paste a read token into the sidebar (**🤗 Hugging Face token**)
+- set `HF_TOKEN`
+- run `huggingface-cli login`
+
+Install the extra dependencies with `pip install -r requirements-gemma.txt` (sentence-transformers ≥ 6.1,
+transformers, torch, torchcodec). Video and audio decoding also needs `ffmpeg` on your PATH. The first run
+downloads the weights; after that, everything runs offline.
+
+### Things to know
+
+- **Benchmarks.** Google reports a large gain in code retrieval (MTEB Code 68.76 → 78.68) and multilingual
+  text results roughly level with the previous EmbeddingGemma. These are Google's own numbers. UW Lens has
+  not reproduced them, and nobody has measured EmbeddingGemma 2 on UW Lens's own corpus yet. Run
+  `UWLENS_EMBEDDER=gemma python run_evals.py` to measure it on your data.
+- **Media budgets.** The tutorial this project follows gives these defaults: about 280 tokens per image,
+  video sampled at about 1 frame per second at about 140 tokens per frame, and audio at about 25 tokens per
+  second. Long video has to be split into clips before indexing.
+- **Precision.** Avoid float16: the model card warns it can produce NaNs.
+- **Not a clinical model.** EmbeddingGemma 2 is a general-purpose retriever. It finds related evidence; it
+  doesn't interpret it. Every result still needs an underwriter's review.
+
+Primary references:
+- [Hugging Face model page](https://huggingface.co/google/embeddinggemma-2)
+- [EmbeddingGemma 2 model card](https://ai.google.dev/gemma/docs/embeddinggemma/model_card_2)
+- [Google launch post](https://blog.google/innovation-and-ai/technology/developers-tools/embeddinggemma-2/)
+- [Developer guide](https://developers.googleblog.com/embeddinggemma-2-the-developer-guide/)
+
 ## What it does
 
 | Area | Details |

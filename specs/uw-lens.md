@@ -137,3 +137,13 @@ They replace the example chips. Picking a sample copies it into the question box
 the pick. Verification: every sample's expected document ranks in the top 5 (all of them in the top 2 with the
 offline fallback); AppTest covers the category → question → results flow and the typed-question reset; tested by
 hand in Chromium. The suite now has 50 passing tests.
+
+### Change 2026-10-11: Hugging Face token in the sidebar
+- A password field under **🤗 Hugging Face token** passes the token to `SentenceTransformer(..., token=...)`.
+- Key hygiene: the token lives in session state only (the widget is cleared after use). `Settings.hf_token` is
+  `repr=False, compare=False`. The model cache is keyed by a SHA-256 fingerprint, never the token itself.
+  Load errors are redacted (`hf_***`) and carry hints for auth failures (401/403/gated) and missing `torch`.
+  Explicit `gemma` mode no longer crashes the UI on a load failure; it shows the error and uses the fallback.
+- Verified with fake `torch`/`sentence_transformers` modules (unit + AppTest) and in Chromium: the field is
+  `type=password`, the raw token appears in neither the page DOM nor the server log, and only the masked form
+  is shown. 57 tests pass.

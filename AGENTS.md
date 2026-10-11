@@ -40,6 +40,7 @@ Run everything from inside `uw-lens/`.
 - Embedders: `auto` tries `google/embeddinggemma-2` and falls back to the lexical hashing embedder. The index manifest pins embedder id + dim; mismatch raises `EmbedderMismatch` (UI offers rebuild). The Gemma adapter's call contract is tested against `FakeST` in `tests/test_embedders.py`, so keep it in sync if the model card's prompt names change.
 - PHI redaction (`textproc.redact_phi`) runs before embedding; `tests/test_index_store.py::test_no_phi_in_stored_records` guards it. The sample corpus is synthetic (`corpus_src/`, rendered by `uwlens/sample_corpus.py`); `sample_corpus/` and `uwlens_index/` are gitignored.
 - Sample questions: `uwlens/questions.py` (category -> 3 questions, each with expected files). `test_every_sample_question_finds_its_document` fails if a sample stops retrieving its source, so update `expect` when you change the corpus. UI keys are `q_category` and `sample_q_<i>`.
+- HF token (sidebar): the token lives in session state `hf_token` only. `_load_embedder_cached` takes it as `_token` (excluded from Streamlit hashing) and keys the cache on `token_fingerprint()`. `Settings.hf_token` is repr=False. Never log it or put it in a status string; `describe_load_error()` redacts it. Covered by `tests/test_hf_token.py`.
 - RAG (`uwlens/rag.py`) is Ollama on localhost only, off by default; `is_local()` refuses remote URLs.
 - Streamlit gotchas: escape corpus text with `md()` in `app.py` (`$` renders as math, `5.`/`-` as lists); after indexing call `st.rerun()` so the sidebar counts refresh.
 

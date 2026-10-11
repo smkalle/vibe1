@@ -1,10 +1,11 @@
 # AGENTS.md
 
-Three unrelated projects share this repo. Do not mix their deps or commands.
+Several unrelated projects share this repo. Do not mix their deps or commands.
 
 - **Root `litserve-mcp-starter`**: runnable scripts in `examples/`, no package, no automated tests.
 - **`jev-call-lab/`**: self-contained Python lab (own `requirements.txt`, pytest suite).
 - **`flysaver/`**: separate Rust screensaver (`Cargo.toml`). See `flysaver/README.md`.
+- **`uw-lens/`**: Streamlit multimodal health-doc search for underwriting (own `requirements.txt`, pytest suite). Spec `specs/uw-lens.md`.
 
 ## Root (LitServe + MCP)
 
@@ -29,4 +30,15 @@ Run everything from inside `jev-call-lab/` (imports assume repo root on `sys.pat
 - Replay risk: distinct calls can share byte-identical early prefix states (47 such keys in `sgd_test`), so one fixture key can cover several turns. With `record` + parallel workers + the stochastic live endpoint, fixture writes are last-write-wins and replay serves one value to all sharers (seen: Δp ≤ 0.03). Record with `--workers 1` for strict reproducibility. Latency provenance: `record` saves each live call's `latency_ms` in its fixture and `replay` returns it (`latency_source=recorded`); mock answers and replays of fixtures recorded before this field (all fixtures committed so far) are `mock`/`replay_local` and are excluded from latency stats and verdicts. The **Audit** tool (`audit.py`, covered in `tests/test_audit.py`) reports these shared keys per run.
 - GLM scorer (`llm_client.py`, default `z-ai/glm-5.3` via OpenRouter chat completions, same `OPENROUTER_API_KEY`): renders the typed questions into a prompt, repairs bad JSON with up to 2 fixups, returns the Jev wire shape so all evaluators work unchanged. Fixtures are `glm_`-prefixed (never collide with Jev's); `LLM_MODE` mirrors `JEV_MODE` (mock routes to `mock_jev`, offline). Reasoning is always on — output bills ~$4.40/1M, so keep benchmark N small. `simulate.py --scorer glm`; results carry a `scorer` tag that `benchmark.py` scorecards and the Compare step consume.
 - Workbench v2 (`app.py`, spec `specs/jev-workbench-v2.md`): six-step workflow + Summary view. Engine: `benchmark.py` (pairing validation, held-out rules, resumable runner with cost cap, latency probe, scorecard, verdict rule, report), `stats.py` (paired cluster bootstrap over calls), `sampling.py` (frozen stratified samples; never "first N": sgd_test's first 30 calls are all unbooked), `workspace.py` (`workspace/<project>/`, gitignored, `$JEV_WORKSPACE`; manifests are whitelisted fields so the key can't be written). Tests set `JEV_WORKSPACE` to `tmp_path`. UI tests: `tests/test_app.py` (Streamlit AppTest). Streamlit drops state of widgets not rendered on the current step; `app.py` re-assigns persistent keys at the top of each run, so keep new cross-step settings in that list. Escape `$` in Markdown prose (`md()`), or Streamlit renders it as math.
+
+## uw-lens/
+
+Run everything from inside `uw-lens/`.
+
+- Setup: `pip install -r requirements.txt` (offline core); `requirements-gemma.txt` adds sentence-transformers/torch for EmbeddingGemma 2. UI: `streamlit run app.py`. CLI: `python -m uwlens {sample,index,search,eval}`.
+- CI job template: `uw-lens/ci-job.example.yml` (not yet in `.github/workflows/ci.yml`). Offline check: `python -m pytest -q tests` (autouse fixture forces `UWLENS_EMBEDDER=hashing` and tmp index/corpus dirs), then `python run_evals.py` -> `evals/REPORT.md`. Needs `ffmpeg` on PATH for the sample video (tests assert 19 corpus files).
+- Embedders: `auto` tries `google/embeddinggemma-2` and falls back to the lexical hashing embedder. The index manifest pins embedder id + dim; mismatch raises `EmbedderMismatch` (UI offers rebuild). The Gemma adapter's call contract is tested against `FakeST` in `tests/test_embedders.py`, so keep it in sync if the model card's prompt names change.
+- PHI redaction (`textproc.redact_phi`) runs before embedding; `tests/test_index_store.py::test_no_phi_in_stored_records` guards it. The sample corpus is synthetic (`corpus_src/`, rendered by `uwlens/sample_corpus.py`); `sample_corpus/` and `uwlens_index/` are gitignored.
+- RAG (`uwlens/rag.py`) is Ollama on localhost only, off by default; `is_local()` refuses remote URLs.
+- Streamlit gotchas: escape corpus text with `md()` in `app.py` (`$` renders as math, `5.`/`-` as lists); after indexing call `st.rerun()` so the sidebar counts refresh.
 

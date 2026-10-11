@@ -9,3 +9,8 @@ venv/
 .idea/
 chroma_db/
 docs/
+
+# uw-lens
+uw-lens/uwlens_index/
+uw-lens/sample_corpus/
+uw-lens/.venv/

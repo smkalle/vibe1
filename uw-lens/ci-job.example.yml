@@ -1,0 +1,21 @@
+# Add this job under `jobs:` in .github/workflows/ci.yml (the session bot cannot edit workflows).
+  uw-lens:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: uw-lens
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install ffmpeg (sample video)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Tests (offline)
+        run: python -m pytest -q tests
+      - name: Retrieval eval
+        run: python run_evals.py

@@ -1,0 +1,42 @@
+{
+  "kenshin_result_0417.png": {
+    "title": "健康診断結果通知書 case 0417 (scanned checkup report)",
+    "source": "case",
+    "language": "ja",
+    "caption": "健康診断結果 スキャン画像。HbA1c 6.9%、血圧 136/86、腹囲 92cm、メタボリックシンドローム該当。Annual health checkup report: HbA1c, blood pressure, waist, metabolic syndrome.",
+    "tags": ["checkup", "kenshin", "HbA1c", "metabolic syndrome"]
+  },
+  "sleep_study_0417.png": {
+    "title": "Home sleep apnea test summary case 0417",
+    "source": "case",
+    "language": "en",
+    "caption": "Scanned home sleep test report. AHI 22.4 moderate obstructive sleep apnea, lowest SpO2 83%, worse supine. CPAP titration recommended.",
+    "tags": ["sleep study", "AHI", "OSA", "CPAP"]
+  },
+  "bp_trend_0417.png": {
+    "title": "Home blood pressure and HbA1c trend chart case 0417",
+    "source": "case",
+    "language": "en",
+    "caption": "Line chart of home blood pressure readings and HbA1c over 2024-2026, showing HbA1c falling from 8.1% to 6.9% and systolic pressure near 135 mmHg.",
+    "tags": ["chart", "blood pressure", "HbA1c", "trend"]
+  },
+  "teleinterview_0417.wav": {
+    "title": "Tele-underwriting interview recording case 0417",
+    "source": "case",
+    "language": "en",
+    "transcript": "Synthetic tele-interview. Applicant confirms CPAP use most nights since April 2025 and says daytime sleepiness has improved. Reports occasional palpitations, Holter test was normal. Takes metformin, empagliflozin, amlodipine and telmisartan. Quit smoking in 2015. No hospital stays in five years.",
+    "segments": [
+      {"start": 0, "end": 30, "text": "Applicant confirms CPAP use most nights since April 2025; daytime sleepiness improved."},
+      {"start": 30, "end": 60, "text": "Occasional palpitations; Holter normal. Medications metformin, empagliflozin, amlodipine, telmisartan."},
+      {"start": 60, "end": 75, "text": "Quit smoking 2015. No hospitalization in five years."}
+    ],
+    "tags": ["tele-interview", "audio", "CPAP", "smoking", "medications"]
+  },
+  "cpap_compliance_0417.mp4": {
+    "title": "CPAP device compliance screen recording case 0417",
+    "source": "case",
+    "language": "en",
+    "caption": "Short screen recording of a CPAP machine usage report: 81% of nights with 4+ hours, residual AHI 3.1, mask leak within normal range over the last 90 days.",
+    "tags": ["CPAP", "compliance", "video", "sleep apnea"]
+  }
+}

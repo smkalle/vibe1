@@ -1,0 +1,9 @@
+-r requirements.txt
+# EmbeddingGemma 2 via sentence-transformers (model downloads once from Hugging Face;
+# accept the Gemma license on the model page and `huggingface-cli login` if prompted)
+sentence-transformers>=6.1.0
+transformers
+torch
+torchcodec  # video/audio decoding used by the processor; needs ffmpeg on PATH
+# Optional: Chroma instead of the built-in NumPy store (UWLENS_STORE=chroma)
+# chromadb>=1.0

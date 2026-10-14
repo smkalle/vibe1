@@ -1,0 +1,5 @@
+# generated when the notebook runs
+ja_asr/
+ja_asr_work/
+serving/
+.ipynb_checkpoints/

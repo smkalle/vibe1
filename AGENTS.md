@@ -6,6 +6,7 @@ Several unrelated projects share this repo. Do not mix their deps or commands.
 - **`jev-call-lab/`**: self-contained Python lab (own `requirements.txt`, pytest suite).
 - **`flysaver/`**: separate Rust screensaver (`Cargo.toml`). See `flysaver/README.md`.
 - **`uw-lens/`**: Streamlit multimodal health-doc search for underwriting (own `requirements.txt`, pytest suite). Spec `specs/uw-lens.md`.
+- **`kumo-relational-sqlite/`**: NVIDIA Kumo Relational notebook tutorial on SQLite (Olist data). No package, no tests.
 
 ## Root (LitServe + MCP)
 
@@ -44,3 +45,9 @@ Run everything from inside `uw-lens/`.
 - RAG (`uwlens/rag.py`) is Ollama on localhost only, off by default; `is_local()` refuses remote URLs.
 - Streamlit gotchas: escape corpus text with `md()` in `app.py` (`$` renders as math, `5.`/`-` as lists); after indexing call `st.rerun()` so the sidebar counts refresh.
 
+## kumo-relational-sqlite/
+
+- Edit `tutorial_source.py` (percent-format cells), then `python build_notebook.py` regenerates `kumo_relational_sqlite_tutorial.ipynb`. Never hand-edit the `.ipynb`. Commit it without outputs.
+- Offline check: `OLIST_SOURCE=synthetic jupyter nbconvert --to notebook --execute --output /tmp/out.ipynb kumo_relational_sqlite_tutorial.ipynb` (~2 min on CPU). With no NIM, Kumo cells print `skipped` and the baselines run. Needs `kumo-relational-client[relational,sqlite]`, scikit-learn, matplotlib.
+- SQLite hard rule: Python `sqlite3` must never open a file a Kumo graph uses. ADBC bundles its own SQLite, the sampler writes `tmp_*` scratch tables inside an open transaction during `predict()`, and in-process POSIX lock loss corrupts the file. The notebook keeps `olist.db` for SQL and `olist_kumo*.db` snapshots for Kumo. Build variant graphs on the same file only before the first `predict()`.
+- `check_pql()` uses the engine-internal `parse_query_locally` (engine 1.0.x). It is a linter only.

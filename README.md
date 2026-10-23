@@ -17,3 +17,6 @@ curl -s -X POST localhost:8000/predict -H "content-type: application/json" -d '{
 
 ## Also in this repo: flysaver
 `flysaver/` is a separate project: *A fly in the Matrix* as an Omarchy screensaver (Rust). See [`flysaver/README.md`](flysaver/README.md) and the spec in [`specs/omarchy-fly-matrix-screensaver.md`](specs/omarchy-fly-matrix-screensaver.md).
+
+## Also in this repo: kumo-relational-sqlite
+`kumo-relational-sqlite/` is a notebook tutorial for NVIDIA Kumo Relational. It turns the Olist e-commerce dataset (Kaggle) into a SQLite database, then runs five multi-table predictions with PQL, without training, and backtests each one against a classic SQL-features baseline. See [`kumo-relational-sqlite/README.md`](kumo-relational-sqlite/README.md).

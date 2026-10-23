@@ -14,3 +14,8 @@ docs/
 uw-lens/uwlens_index/
 uw-lens/sample_corpus/
 uw-lens/.venv/
+
+# kumo-relational-sqlite
+kumo-relational-sqlite/kumo_work/
+kumo-relational-sqlite/.venv/
+kumo-relational-sqlite/.ipynb_checkpoints/

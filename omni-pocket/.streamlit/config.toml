@@ -1,0 +1,15 @@
+[server]
+headless = true
+port = 8501
+# Upload limit (MB): phone photos + 30 s WAV are far below this.
+maxUploadSize = 50
+
+[browser]
+gatherUsageStats = false
+serverAddress = "localhost"
+
+[client]
+toolbarMode = "minimal"
+
+[theme]
+primaryColor = "#7c3aed"

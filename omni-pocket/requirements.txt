@@ -1,0 +1,5 @@
+# Phone/UI core: Termux, UserLAnd Arch, desktop. No torch here.
+streamlit>=1.40
+requests>=2.31
+numpy>=1.24
+pillow>=10.0

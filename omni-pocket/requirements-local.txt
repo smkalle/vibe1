@@ -1,0 +1,10 @@
+# Python baseline engine (UserLAnd / proot Arch aarch64, Linux, macOS, GPU boxes).
+# Termux (Android/Bionic) has no PyTorch wheels on PyPI - use WebGPU or remote there.
+-r requirements.txt
+torch>=2.5
+torchvision
+transformers>=5.20.2
+accelerate
+torchcodec
+soundfile
+librosa

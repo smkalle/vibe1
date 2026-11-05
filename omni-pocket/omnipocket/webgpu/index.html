@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Omni Pocket WebGPU</title>
+<style>
+  :root { --bg:#ffffff; --fg:#1f2328; --muted:#656d76; --card:#f6f8fa; --line:#d0d7de; --accent:#6d28d9; --ok:#1a7f37; --bad:#cf222e; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0e1117; --fg:#e6edf3; --muted:#8b949e; --card:#161b22; --line:#30363d; --accent:#a78bfa; --ok:#3fb950; --bad:#f85149; } }
+  body.dark { --bg:#0e1117; --fg:#e6edf3; --muted:#8b949e; --card:#161b22; --line:#30363d; --accent:#a78bfa; --ok:#3fb950; --bad:#f85149; }
+  body.light { --bg:#ffffff; --fg:#1f2328; --muted:#656d76; --card:#f6f8fa; --line:#d0d7de; --accent:#6d28d9; --ok:#1a7f37; --bad:#cf222e; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:4px; background:var(--bg); color:var(--fg); font:15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:12px; }
+  h3 { margin:0 0 8px; font-size:16px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  button { font:inherit; padding:10px 14px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--fg); min-height:44px; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button:disabled { opacity:.5; }
+  button.rec { background:var(--bad); border-color:var(--bad); color:#fff; }
+  .muted { color:var(--muted); font-size:13px; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  td { padding:3px 6px; border-bottom:1px solid var(--line); vertical-align:top; word-break:break-word; }
+  td:first-child { color:var(--muted); width:42%; }
+  video, canvas.snap { width:100%; max-height:320px; border-radius:10px; background:#000; object-fit:contain; }
+  #answer { white-space:pre-wrap; min-height:2.5em; padding:8px; border-radius:8px; background:var(--bg); border:1px solid var(--line); }
+  progress { width:100%; height:10px; }
+  input[type=text] { font:inherit; width:100%; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--fg); }
+</style>
+</head>
+<body>
+<section id="probe-card">
+  <h3>1 · WebGPU device check</h3>
+  <div class="row">
+    <button class="primary" id="btn-probe">Check WebGPU</button>
+    <button id="btn-bench">Run GPU matmul benchmark</button>
+  </div>
+  <p class="muted" id="probe-status">Runs entirely in this browser. Nothing is uploaded.</p>
+  <table id="probe-table"></table>
+</section>
+
+<section id="live-card">
+  <h3>2 · Live camera + voice agent (in-browser model)</h3>
+  <p class="muted">Downloads the ONNX model once (~1.6 GB, cached by the browser), then runs offline on the phone GPU.
+    <b>Experimental:</b> needs a transformers.js build that supports the model; if loading fails, use the official demo link above.</p>
+  <div class="row">
+    <button class="primary" id="btn-load">Load model</button>
+    <button id="btn-cam">Start camera</button>
+    <button id="btn-flip" disabled>Flip</button>
+  </div>
+  <progress id="load-progress" value="0" max="100" hidden></progress>
+  <p class="muted" id="load-status"></p>
+  <video id="video" playsinline muted hidden></video>
+  <canvas id="snap" class="snap" hidden></canvas>
+  <div style="height:8px"></div>
+  <input type="text" id="prompt" placeholder="Optional typed question (or hold the mic button)">
+  <div style="height:8px"></div>
+  <div class="row">
+    <button id="btn-mic" disabled>Hold to talk</button>
+    <button class="primary" id="btn-ask" disabled>Ask</button>
+    <label class="muted"><input type="checkbox" id="chk-frame" checked> include camera frame</label>
+    <label class="muted"><input type="checkbox" id="chk-speak"> speak answer</label>
+  </div>
+  <p class="muted" id="mic-status"></p>
+  <div id="answer"></div>
+  <p class="muted" id="stats"></p>
+</section>
+
+<script type="module">
+// ---------------------------------------------------------------------------
+// Minimal Streamlit component protocol (no npm build needed)
+// ---------------------------------------------------------------------------
+let ARGS = {};
+let SEQ = 0;
+function sendToStreamlit(type, data) {
+  window.parent.postMessage({ isStreamlitMessage: true, type, ...data }, "*");
+}
+function setValue(value) {
+  SEQ += 1;
+  sendToStreamlit("streamlit:setComponentValue", { value: { seq: SEQ, at: Date.now(), ...value }, dataType: "json" });
+}
+function setHeight() {
+  sendToStreamlit("streamlit:setFrameHeight", { height: document.documentElement.scrollHeight + 8 });
+}
+new ResizeObserver(setHeight).observe(document.body);
+window.addEventListener("message", (ev) => {
+  if (ev.data?.type !== "streamlit:render") return;
+  ARGS = ev.data.args || {};
+  const theme = ev.data.theme;
+  if (theme?.base) document.body.className = theme.base === "dark" ? "dark" : "light";
+  document.getElementById("chk-speak").checked = !!ARGS.speak;
+  setHeight();
+});
+sendToStreamlit("streamlit:componentReady", { apiVersion: 1 });
+
+const $ = (id) => document.getElementById(id);
+
+// ---------------------------------------------------------------------------
+// 1. Probe
+// ---------------------------------------------------------------------------
+let gpuDevice = null, gpuAdapter = null;
+
+async function probe() {
+  const rows = [];
+  const add = (k, v) => rows.push([k, v]);
+  add("secure context", window.isSecureContext ? "yes" : "NO - open via http://localhost, not a LAN IP");
+  add("user agent", navigator.userAgent);
+  add("device memory (GB, approx)", navigator.deviceMemory ?? "n/a");
+  add("CPU threads", navigator.hardwareConcurrency ?? "n/a");
+  let result = { webgpu: false };
+  if (!("gpu" in navigator)) {
+    add("WebGPU", "NOT available (needs Chrome 121+ on Android 12+, or enable chrome://flags/#enable-unsafe-webgpu)");
+  } else {
+    try {
+      gpuAdapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+      if (!gpuAdapter) throw new Error("requestAdapter() returned null (GPU blocklisted?)");
+      const info = gpuAdapter.info || (gpuAdapter.requestAdapterInfo ? await gpuAdapter.requestAdapterInfo() : {});
+      const feats = [...gpuAdapter.features].sort();
+      const L = gpuAdapter.limits;
+      add("WebGPU", "available");
+      add("GPU", [info.vendor, info.architecture, info.device, info.description].filter(Boolean).join(" / ") || "(hidden)");
+      add("shader-f16 (needed for q4f16)", feats.includes("shader-f16") ? "yes" : "no - use fp32/q4 dtypes");
+      add("maxBufferSize", (L.maxBufferSize / 2 ** 20).toFixed(0) + " MiB");
+      add("maxStorageBufferBindingSize", (L.maxStorageBufferBindingSize / 2 ** 20).toFixed(0) + " MiB");
+      add("maxComputeWorkgroupStorageSize", L.maxComputeWorkgroupStorageSize + " B");
+      add("features", feats.join(", "));
+      result = {
+        webgpu: true, vendor: info.vendor || "", architecture: info.architecture || "",
+        shader_f16: feats.includes("shader-f16"), max_buffer_mb: Math.round(L.maxBufferSize / 2 ** 20),
+        max_storage_binding_mb: Math.round(L.maxStorageBufferBindingSize / 2 ** 20),
+      };
+    } catch (e) {
+      add("WebGPU", "error: " + e.message);
+    }
+  }
+  $("probe-table").innerHTML = rows.map(([k, v]) => `<tr><td>${k}</td><td>${String(v).replace(/</g, "&lt;")}</td></tr>`).join("");
+  $("probe-status").innerHTML = result.webgpu ? '<span class="ok">WebGPU ready.</span>' : '<span class="bad">No WebGPU - use the remote or transformers engine.</span>';
+  setValue({ kind: "probe", secure: window.isSecureContext, ua: navigator.userAgent, ...result });
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// 1b. Matmul micro-benchmark: sustained GFLOP/s for f32 (and f16 if present).
+// LLM decode is memory-bound, prefill is compute-bound; this measures the
+// latter and is a quick sanity check that the GPU path is actually used.
+// ---------------------------------------------------------------------------
+async function matmulBench(N, f16) {
+  const T = f16 ? "f16" : "f32";
+  const code = `${f16 ? "enable f16;" : ""}
+  @group(0) @binding(0) var<storage, read> A: array<${T}>;
+  @group(0) @binding(1) var<storage, read> B: array<${T}>;
+  @group(0) @binding(2) var<storage, read_write> C: array<${T}>;
+  const N: u32 = ${N}u;
+  var<workgroup> As: array<array<${T}, 16>, 16>;
+  var<workgroup> Bs: array<array<${T}, 16>, 16>;
+  @compute @workgroup_size(16, 16)
+  fn main(@builtin(global_invocation_id) g: vec3<u32>, @builtin(local_invocation_id) l: vec3<u32>) {
+    var acc: ${T} = ${T}(0);
+    for (var t: u32 = 0u; t < N; t = t + 16u) {
+      As[l.y][l.x] = A[g.y * N + t + l.x];
+      Bs[l.y][l.x] = B[(t + l.y) * N + g.x];
+      workgroupBarrier();
+      for (var k: u32 = 0u; k < 16u; k = k + 1u) { acc = acc + As[l.y][k] * Bs[k][l.x]; }
+      workgroupBarrier();
+    }
+    C[g.y * N + g.x] = acc;
+  }`;
+  const dev = gpuDevice;
+  const bytes = N * N * (f16 ? 2 : 4);
+  const mk = (usage) => dev.createBuffer({ size: bytes, usage });
+  const a = mk(GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST), b = mk(GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST), c = mk(GPUBufferUsage.STORAGE);
+  const init = f16 ? new Uint16Array(N * N).fill(0x3c00) : new Float32Array(N * N).fill(1);  // all ones
+  dev.queue.writeBuffer(a, 0, init); dev.queue.writeBuffer(b, 0, init);
+  const pipe = dev.createComputePipeline({ layout: "auto", compute: { module: dev.createShaderModule({ code }), entryPoint: "main" } });
+  const bind = dev.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [a, b, c].map((buffer, i) => ({ binding: i, resource: { buffer } })) });
+  const run = async (iters) => {
+    const enc = dev.createCommandEncoder();
+    for (let i = 0; i < iters; i++) {
+      const p = enc.beginComputePass(); p.setPipeline(pipe); p.setBindGroup(0, bind); p.dispatchWorkgroups(N / 16, N / 16); p.end();
+    }
+    dev.queue.submit([enc.finish()]);
+    await dev.queue.onSubmittedWorkDone();
+  };
+  await run(2);  // warm-up / shader compile
+  const iters = 10, t0 = performance.now();
+  await run(iters);
+  const ms = (performance.now() - t0) / iters;
+  [a, b, c].forEach((x) => x.destroy());
+  return { N, dtype: T, ms_per_matmul: +ms.toFixed(2), gflops: +((2 * N ** 3) / (ms / 1000) / 1e9).toFixed(1) };
+}
+
+async function bench() {
+  $("btn-bench").disabled = true;
+  $("probe-status").textContent = "Benchmarking... (keep the screen on)";
+  try {
+    if (!gpuAdapter) await probe();
+    if (!gpuAdapter) throw new Error("no WebGPU adapter");
+    const f16 = gpuAdapter.features.has("shader-f16");
+    gpuDevice = gpuDevice || await gpuAdapter.requestDevice({ requiredFeatures: f16 ? ["shader-f16"] : [] });
+    const results = [await matmulBench(1024, false)];
+    if (f16) results.push(await matmulBench(1024, true));
+    const html = results.map((r) => `<tr><td>matmul ${r.N}² ${r.dtype}</td><td><b>${r.gflops} GFLOP/s</b> (${r.ms_per_matmul} ms)</td></tr>`).join("");
+    $("probe-table").insertAdjacentHTML("beforeend", html);
+    $("probe-status").innerHTML = '<span class="ok">Benchmark done.</span>';
+    setValue({ kind: "gpu_bench", results });
+  } catch (e) {
+    $("probe-status").innerHTML = `<span class="bad">Benchmark failed: ${e.message}</span>`;
+  } finally {
+    $("btn-bench").disabled = false;
+  }
+}
+
+$("btn-probe").onclick = probe;
+$("btn-bench").onclick = bench;
+
+// ---------------------------------------------------------------------------
+// 2. Live agent
+// ---------------------------------------------------------------------------
+let TJS = null, model = null, processor = null;
+let stream = null, facing = "environment";
+
+async function loadModel() {
+  $("btn-load").disabled = true;
+  const ver = ARGS.transformers_js || "4.0.0";
+  const modelId = ARGS.onnx_model_id || "LiquidAI/LFM3-Omni-2B-ONNX";
+  const status = (t) => ($("load-status").textContent = t);
+  try {
+    status(`Importing transformers.js@${ver} ...`);
+    TJS = await import(`https://cdn.jsdelivr.net/npm/@huggingface/transformers@${ver}`);
+    // Model class name differs between transformers.js releases; use the first one present.
+    const cls = (ARGS.model_class ? [ARGS.model_class] : [])
+      .concat(["AutoModelForMultimodalLM", "AutoModelForImageTextToText", "AutoModelForVision2Seq"])
+      .find((n) => TJS[n]);
+    if (!cls) throw new Error("this transformers.js build has no multimodal model class");
+    let dtype = ARGS.dtype || "q4f16";
+    try { dtype = JSON.parse(dtype); } catch (_) { /* plain string like "q4f16" */ }
+    const files = {};
+    const bar = $("load-progress"); bar.hidden = false;
+    const progress_callback = (p) => {
+      if (p.status === "progress" && p.total) {
+        files[p.file] = [p.loaded, p.total];
+        const [l, t] = Object.values(files).reduce(([a, b], [x, y]) => [a + x, b + y], [0, 0]);
+        bar.value = (100 * l) / t;
+        status(`Downloading ${(l / 1e9).toFixed(2)} / ${(t / 1e9).toFixed(2)} GB (cached after first run)`);
+      }
+    };
+    const t0 = performance.now();
+    processor = await TJS.AutoProcessor.from_pretrained(modelId, { progress_callback });
+    model = await TJS[cls].from_pretrained(modelId, { device: "webgpu", dtype, progress_callback });
+    const secs = (performance.now() - t0) / 1000;
+    bar.hidden = true;
+    status(`Loaded ${modelId} with ${cls} on WebGPU in ${secs.toFixed(1)} s.`);
+    $("btn-ask").disabled = false; $("btn-mic").disabled = false;
+    setValue({ kind: "model_loaded", model: modelId, cls, load_s: +secs.toFixed(1), transformers_js: ver });
+  } catch (e) {
+    status("Load failed: " + e.message + "  ->  try another transformers.js version / dtype in the sidebar, or the official demo.");
+    $("btn-load").disabled = false;
+    setValue({ kind: "error", where: "load", message: String(e.message || e) });
+  }
+}
+
+async function startCamera() {
+  try {
+    if (stream) stream.getTracks().forEach((t) => t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 } }, audio: false });
+    const v = $("video"); v.srcObject = stream; v.hidden = false; await v.play();
+    $("btn-flip").disabled = false;
+  } catch (e) {
+    $("load-status").textContent = "Camera error: " + e.message;
+  }
+}
+
+function grabFrame(maxSide = 640) {
+  const v = $("video");
+  if (!stream || !v.videoWidth) return null;
+  const s = Math.min(1, maxSide / Math.max(v.videoWidth, v.videoHeight));
+  const c = $("snap"); c.width = Math.round(v.videoWidth * s); c.height = Math.round(v.videoHeight * s);
+  c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+  return c;
+}
+
+// --- microphone: record, decode, resample to 16 kHz mono Float32 ---------
+let rec = null, chunks = [], micStream = null, lastAudio = null;
+async function micDown() {
+  try {
+    micStream = micStream || await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+    chunks = []; rec = new MediaRecorder(micStream);
+    rec.ondataavailable = (e) => chunks.push(e.data);
+    rec.start(); $("btn-mic").classList.add("rec"); $("btn-mic").textContent = "Recording... release to stop";
+  } catch (e) { $("mic-status").textContent = "Mic error: " + e.message; }
+}
+async function micUp() {
+  if (!rec || rec.state !== "recording") return;
+  await new Promise((r) => { rec.onstop = r; rec.stop(); });
+  $("btn-mic").classList.remove("rec"); $("btn-mic").textContent = "Hold to talk";
+  const buf = await new Blob(chunks).arrayBuffer();
+  const ctx = new AudioContext();
+  const decoded = await ctx.decodeAudioData(buf); ctx.close();
+  const off = new OfflineAudioContext(1, Math.ceil(decoded.duration * 16000), 16000);
+  const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start();
+  lastAudio = (await off.startRendering()).getChannelData(0);
+  $("mic-status").textContent = `Captured ${(lastAudio.length / 16000).toFixed(1)} s of audio.` + (lastAudio.length > 30 * 16000 ? " (long clips mean long prefill - keep questions < 30 s)" : "");
+  if (ARGS.auto_ask_after_speech !== false) ask();
+}
+
+// --- inference ------------------------------------------------------------
+let busy = false;
+async function ask() {
+  if (!model || busy) return;
+  busy = true; $("btn-ask").disabled = true;
+  const typed = $("prompt").value.trim();
+  const frame = $("chk-frame").checked ? grabFrame() : null;
+  const content = [];
+  if (frame) content.push({ type: "image" });
+  if (lastAudio) content.push({ type: "audio" });
+  if (typed) content.push({ type: "text", text: typed });
+  if (!content.length) { busy = false; $("btn-ask").disabled = false; return; }
+  const messages = [{ role: "system", content: ARGS.system || "You are a helpful assistant. Answer briefly." },
+                    { role: "user", content }];
+  $("answer").textContent = ""; $("stats").textContent = "Prefilling...";
+  const t0 = performance.now(); let tFirst = null, nTok = 0;
+  try {
+    const prompt = processor.apply_chat_template(messages, { add_generation_prompt: true });
+    const image = frame ? await TJS.RawImage.fromCanvas(frame) : null;
+    const inputs = await processor(prompt, image, lastAudio, { add_special_tokens: false });
+    const streamer = new TJS.TextStreamer(processor.tokenizer, {
+      skip_prompt: true, skip_special_tokens: true,
+      callback_function: (t) => { $("answer").textContent += t; },
+      token_callback_function: () => { nTok++; if (tFirst === null) tFirst = performance.now(); },
+    });
+    await model.generate({ ...inputs, max_new_tokens: ARGS.max_new_tokens || 256, do_sample: false, streamer });
+    const total = (performance.now() - t0) / 1000, ttft = ((tFirst ?? performance.now()) - t0) / 1000;
+    const tps = nTok > 1 ? (nTok - 1) / Math.max(1e-3, total - ttft) : null;
+    $("stats").textContent = `TTFT ${ttft.toFixed(2)} s · ${nTok} tokens · ${tps ? tps.toFixed(1) : "?"} tok/s · total ${total.toFixed(1)} s`;
+    const text = $("answer").textContent;
+    if ($("chk-speak").checked && "speechSynthesis" in window) speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+    setValue({ kind: "answer", text, ttft_s: +ttft.toFixed(3), total_s: +total.toFixed(3), output_tokens: nTok,
+               tokens_per_s: tps ? +tps.toFixed(2) : null, mode: content.map((c) => c.type).join("+") });
+  } catch (e) {
+    $("stats").textContent = "Generation failed: " + e.message;
+    setValue({ kind: "error", where: "generate", message: String(e.message || e) });
+  } finally {
+    lastAudio = null; busy = false; $("btn-ask").disabled = false;
+  }
+}
+
+$("btn-load").onclick = loadModel;
+$("btn-cam").onclick = startCamera;
+$("btn-flip").onclick = () => { facing = facing === "environment" ? "user" : "environment"; startCamera(); };
+$("btn-ask").onclick = ask;
+const mic = $("btn-mic");
+mic.addEventListener("pointerdown", (e) => { e.preventDefault(); micDown(); });
+["pointerup", "pointerleave", "pointercancel"].forEach((ev) => mic.addEventListener(ev, micUp));
+setHeight();
+</script>
+</body>
+</html>

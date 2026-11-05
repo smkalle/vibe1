@@ -54,3 +54,15 @@ def test_benchmarks_tab_after_run():
     at.run()
     assert not at.exception, at.exception
     assert any("Median" in s.value for s in at.subheader)
+
+
+def test_llamacpp_engine_shows_start_hint_when_server_down(monkeypatch):
+    monkeypatch.setenv("OMNI_LLAMA_URL", "http://127.0.0.1:9/v1")
+    at = run_app()
+    at.sidebar.selectbox[0].set_value("llamacpp").run()
+    assert not at.exception, at.exception
+    assert any("llama-server is not running" in w.value for w in at.sidebar.warning)
+    at.radio[0].set_value("none")
+    at.text_area[0].input("hi")
+    at.button[0].click().run()
+    assert any("llama_server.sh" in i.value for i in at.info)

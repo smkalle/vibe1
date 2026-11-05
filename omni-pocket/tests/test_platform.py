@@ -27,6 +27,6 @@ def test_mem_info(tmp_path):
 def test_recommend_ram_fit():
     notes = recommend("termux", 8 * 1024, {"streamlit": True})
     text = "\n".join(notes)
-    assert "PyTorch wheels are not on PyPI" in text
+    assert "PyTorch wheels are not on PyPI" in text and "llama.cpp" in text
     assert "bfloat16: needs ~4.4 GB for weights -> fits in 8.0 GB RAM" in text
     assert "float32: needs ~8.7 GB for weights -> too big" in text

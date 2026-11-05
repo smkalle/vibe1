@@ -13,7 +13,7 @@ import time
 import streamlit as st
 
 from omnipocket import __version__
-from omnipocket.config import ENGINES, OFFICIAL_WEBGPU_DEMO, Settings
+from omnipocket.config import DEFAULT_GGUF, ENGINES, OFFICIAL_WEBGPU_DEMO, Settings, server_alive
 from omnipocket.engines import OmniRequest, StreamTimer, make_engine
 from omnipocket.history import logs, summarize
 from omnipocket.media import normalize_speech, prepare_image
@@ -38,9 +38,19 @@ with st.sidebar:
     st.header("Engine")
     default_engine = BASE.resolve_engine()
     engine_name = st.selectbox("Python engine (Ask tab)", ENGINES, index=ENGINES.index(default_engine),
-                               help="mock = offline demo · remote = your GPU box / any OpenAI-compatible server · "
+                               help="llamacpp = llama.cpp server on this phone (recommended on Termux) · "
+                                    "mock = offline demo · remote = your GPU box / any OpenAI-compatible server · "
                                     "transformers = run the model in this Python (UserLAnd / desktop).")
     settings = Settings.from_env()
+    if engine_name == "llamacpp":
+        settings.llama_url = st.text_input("llama-server URL", BASE.llama_url)
+        if server_alive(settings.llama_url, timeout=1.0):
+            st.success("llama-server is running", icon="✅")
+        else:
+            st.warning("llama-server is not running. In Termux:", icon="⚠️")
+            st.code("./scripts/llama_server.sh", language="bash")
+            st.caption(f"Downloads `{DEFAULT_GGUF}` (+ mmproj) once, then runs offline. "
+                       "Or start everything with `./scripts/run.sh --llama`.")
     if engine_name == "remote":
         settings.remote_url = st.text_input("Server URL", BASE.remote_url,
                                             help="e.g. http://192.168.1.20:8088/v1 or a Tailscale name")
@@ -197,6 +207,8 @@ with tab_ask:
                     res = None
             except Exception as exc:
                 st.error(f"{engine_name} engine failed: {exc.__class__.__name__}: {exc}")
+                if engine_name == "llamacpp":
+                    st.info("Start the model server first: `./scripts/llama_server.sh` (or `./scripts/run.sh --llama`).")
                 if engine_name == "transformers":
                     st.info("No torch on this device? Use the **Live (WebGPU)** tab or the remote engine. "
                             "See guides/INSTALL_USERLAND_ARCH.md.")
@@ -223,8 +235,15 @@ with tab_ask:
 with tab_live:
     st.markdown(
         "Runs the **ONNX** export of the model **inside Chrome on your phone's GPU** — nothing is sent to "
-        "this Python server. Works from plain Termux (no PyTorch needed). Open the app as "
-        "`http://localhost:8501`: camera, mic and WebGPU need a secure context."
+        "this Python server. Open the app as `http://localhost:8501`: camera, mic and WebGPU need a "
+        "secure context."
+    )
+    st.info(
+        "**Status (Nov 2026):** no published transformers.js release (≤ 4.3.2, 4.4.0-next.0) knows the "
+        "`lfm3_omni` model type yet, so *Load model* fails with *Unsupported model type*. The device check "
+        "and GPU benchmark work. To run the real model on the phone today, use the **llamacpp** engine "
+        "(`./scripts/run.sh --llama`), or the official demo below.",
+        icon="ℹ️",
     )
     st.link_button("Open the official LFM3-Omni WebGPU demo", OFFICIAL_WEBGPU_DEMO, use_container_width=True)
     event = webgpu_panel(
@@ -254,7 +273,12 @@ with tab_live:
 
     if st.session_state.get("webgpu_error"):
         err = st.session_state.webgpu_error
-        st.warning(f"Browser engine error during {err.get('where')}: {err.get('message')}")
+        msg = str(err.get("message", ""))
+        if "Unsupported model type" in msg:
+            st.error(f"{msg} — this transformers.js build cannot run LFM3-Omni. Switch the sidebar engine to "
+                     "**llamacpp** and run `./scripts/llama_server.sh`, then use the Ask tab.")
+        else:
+            st.warning(f"Browser engine error during {err.get('where')}: {msg}")
 
 # ----------------------------------------------------------- Benchmarks tab --
 with tab_bench:
@@ -307,7 +331,8 @@ with tab_device:
     st.subheader("Which engine should I use?")
     st.markdown(
         "| You have | Use |\n|---|---|\n"
-        "| Termux only, Chrome 121+ | **Live (WebGPU)** tab — model runs on the phone GPU |\n"
+        "| Termux (any phone, 6 GB+ RAM) | **llamacpp** — `./scripts/run.sh --llama` (GGUF Q4_K_M on the CPU) |\n"
+        "| Termux only, Chrome 121+ | **Live (WebGPU)** tab — waiting for transformers.js `lfm3_omni` support |\n"
         "| Termux + a PC with a GPU | **remote** engine → `python -m omnipocket serve` on the PC |\n"
         "| UserLAnd / proot Arch, ≥ 8 GB RAM | **transformers** engine (bfloat16, CPU, slow but fully local) |\n"
         "| Just trying the UI | **mock** engine |"

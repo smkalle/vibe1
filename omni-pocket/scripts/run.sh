@@ -2,12 +2,18 @@
 # Start the Streamlit UI.
 #   ./scripts/run.sh            # localhost only (camera/mic/WebGPU work in Chrome on this phone)
 #   ./scripts/run.sh --lan      # also reachable from other devices (no camera/WebGPU there: not https)
+#   ./scripts/run.sh --llama    # also start llama-server with LFM3-Omni GGUF on this phone
 #   OMNI_ENGINE=remote OMNI_REMOTE_URL=http://pc:8088/v1 ./scripts/run.sh
 source "$(dirname "$0")/common.sh"
 HOST="${OMNI_HOST:-127.0.0.1}"
 PORT="${OMNI_PORT:-8501}"
 OPEN=1
-for a in "$@"; do case "$a" in --lan) HOST=0.0.0.0;; --no-open) OPEN=0;; *) die "unknown flag $a";; esac; done
+LLAMA=0
+for a in "$@"; do case "$a" in --lan) HOST=0.0.0.0;; --no-open) OPEN=0;; --llama) LLAMA=1;; *) die "unknown flag $a";; esac; done
+if [[ "$LLAMA" == 1 ]]; then
+  "$(dirname "$0")/llama_server.sh" --background
+  export OMNI_ENGINE=llamacpp
+fi
 
 activate
 cd "$ROOT"

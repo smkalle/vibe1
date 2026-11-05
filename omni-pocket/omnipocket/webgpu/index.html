@@ -222,7 +222,7 @@ let stream = null, facing = "environment";
 
 async function loadModel() {
   $("btn-load").disabled = true;
-  const ver = ARGS.transformers_js || "4.0.0";
+  const ver = ARGS.transformers_js || "4.3.2";
   const modelId = ARGS.onnx_model_id || "LiquidAI/LFM3-Omni-2B-ONNX";
   const status = (t) => ($("load-status").textContent = t);
   try {
@@ -254,7 +254,10 @@ async function loadModel() {
     $("btn-ask").disabled = false; $("btn-mic").disabled = false;
     setValue({ kind: "model_loaded", model: modelId, cls, load_s: +secs.toFixed(1), transformers_js: ver });
   } catch (e) {
-    status("Load failed: " + e.message + "  ->  try another transformers.js version / dtype in the sidebar, or the official demo.");
+    const unsupported = /Unsupported model type/i.test(String(e.message));
+    status("Load failed: " + e.message + (unsupported
+      ? "  ->  transformers.js has no LFM3-Omni support yet. Use the llamacpp engine (./scripts/run.sh --llama) or the official demo."
+      : "  ->  check the transformers.js version / dtype in the sidebar, or use the official demo."));
     $("btn-load").disabled = false;
     setValue({ kind: "error", where: "load", message: String(e.message || e) });
   }

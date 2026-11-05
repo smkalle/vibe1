@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Omni Pocket installer for plain Termux (F-Droid / GitHub build of Termux).
-# Installs the UI + mock/remote engines. The model itself runs either in
-# Chrome (WebGPU tab) or on a GPU box (remote engine) - PyTorch has no
-# Android wheels, so the 'transformers' engine needs UserLAnd/proot instead.
+# Installs the UI + llama.cpp (runs LFM3-Omni-2B GGUF on the phone: engine
+# "llamacpp") + mock/remote engines. PyTorch has no Android wheels, so the
+# 'transformers' engine needs UserLAnd/proot instead.
 source "$(dirname "$0")/common.sh"
 [[ "$(detect_env)" == termux ]] || die "this script is for Termux; see guides/ for other environments"
 
@@ -11,7 +11,7 @@ pkg update -y && pkg upgrade -y
 
 say "Installing prebuilt Python stack (avoids compiling numpy/pyarrow on the phone)"
 pkg install -y python python-pip git python-numpy python-pillow python-pyarrow \
-               rust binutils clang make pkg-config libjpeg-turbo termux-tools
+               rust binutils clang make pkg-config libjpeg-turbo termux-tools curl llama-cpp
 
 say "pandas (Streamlit dependency)"
 if ! python -c 'import pandas' 2>/dev/null; then
@@ -36,4 +36,5 @@ if ! command -v termux-tts-speak >/dev/null 2>&1; then
 fi
 mkdir -p "$ROOT/omni_data"
 python -m omnipocket doctor || true
-say "Done. Start with:  ./scripts/run.sh   (then Chrome opens http://localhost:8501)"
+say "llama.cpp: $(llama-server --version 2>&1 | head -1) (needs v0.8.0+ for LFM3-Omni)"
+say "Done. Start with:  ./scripts/run.sh --llama   (downloads the ~1.5 GB GGUF once, then opens http://localhost:8501)"

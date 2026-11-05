@@ -53,6 +53,7 @@ def test_build_messages_openai_shape():
 class FakeResponse:
     def __init__(self, lines=None, body=None, status=200):
         self.lines, self.body, self.status_code, self.text = lines or [], body, status, "err"
+        self.content = b""
 
     def iter_lines(self, decode_unicode=True):
         yield from self.lines
@@ -67,7 +68,13 @@ class FakeSession:
 
     def post(self, url, headers=None, json=None, timeout=None, stream=False):
         self.calls.append({"url": url, "headers": headers, "json": json})
+        if url.endswith("/tts"):
+            r = FakeResponse(status=self.tts_status)
+            r.content = b"RIFF\x00\x00WAVEfmt " if self.tts_status == 200 else b"{}"
+            return r
         return self.resp
+
+    tts_status = 404
 
 
 def sse(*pieces):
@@ -119,3 +126,32 @@ def test_transformers_engine_conversation_without_loading(tmp_path):
     assert kinds == ["image", "audio", "text"]
     assert (tmp_path / "image.jpg").exists() and (tmp_path / "audio.wav").exists()
     assert eng._gen_kwargs(OmniRequest(temperature=0))["generation_mode"] == "text"
+
+
+def test_llamacpp_engine_targets_local_llama_server():
+    s = Settings()
+    eng = make_engine("llamacpp", s)
+    assert eng.name == "llamacpp" and eng.base_url == "http://127.0.0.1:8080/v1"
+    assert eng.root == "http://127.0.0.1:8080"
+
+
+def test_speech_falls_back_to_llama_server_tts():
+    body = {"choices": [{"message": {"content": "hello there"}}], "usage": {}}
+    sess = FakeSession(FakeResponse(body=body))
+    sess.tts_status = 200
+    res = RemoteEngine("http://127.0.0.1:8080/v1", "m", session=sess).generate(OmniRequest(text="x", want_speech=True))
+    assert res.audio_wav.startswith(b"RIFF")
+    assert sess.calls[-1]["url"] == "http://127.0.0.1:8080/tts" and sess.calls[-1]["json"] == {"input": "hello there"}
+
+
+def test_speech_without_tts_gives_note_not_error():
+    body = {"choices": [{"message": {"content": "hello"}}], "usage": {}}
+    sess = FakeSession(FakeResponse(body=body))
+    res = RemoteEngine("http://pc/v1", "m", session=sess).generate(OmniRequest(text="x", want_speech=True))
+    assert res.audio_wav is None and any("/tts 404" in n for n in res.notes)
+
+
+def test_server_alive_false_when_nothing_listens():
+    from omnipocket.config import server_alive
+
+    assert server_alive("http://127.0.0.1:9/v1", timeout=0.2) is False

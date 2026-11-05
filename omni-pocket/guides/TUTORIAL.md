@@ -109,6 +109,12 @@ The export lives at `LiquidAI/LFM3-Omni-2B-ONNX`. The model card's WebGPU notes 
 The custom WGSL kernels Xenova used for the headline speeds (about 280 tok/s on an M4 Max) live at
 [huggingface.co/webgpu-kernels](https://huggingface.co/webgpu-kernels) and load through `@huggingface/kernels`.
 
+> **Status, Nov 2026:** the published transformers.js releases (≤ 4.3.2,
+> 4.4.0-next.0) support `lfm3` and `lfm3_vl` but not `lfm3_omni`, so loading
+> the ONNX repo fails with `Unsupported model type: lfm3_omni`. The official
+> demo Space works because it ships its own build. Until a release adds the
+> type, the practical on-phone path is llama.cpp (section 3b).
+
 **In this repo:** the **Live (WebGPU)** tab is a bidirectional Streamlit
 component (`omnipocket/webgpu/index.html`). It has no npm build, because it
 speaks Streamlit's `postMessage` protocol directly. It does three things:
@@ -136,6 +142,29 @@ Benchmarks tab.
 the logs, and gives you the other engines for comparison. The heavy lifting
 runs on the phone GPU in Chrome, so this works from **plain Termux** with no
 PyTorch.
+
+---
+
+## 3b. The on-phone path that works today: llama.cpp + GGUF
+
+llama.cpp added LFM3-Audio and LFM3-Omni in PR #31257 (released in v0.8.0,
+Oct 28 2026). LiquidAI publishes `LiquidAI/LFM3-Omni-2B-GGUF` (Q4_K_M model
+plus a Q8_0 multimodal projector). Termux packages llama.cpp, so the whole
+stack is:
+
+```bash
+pkg install llama-cpp
+llama-server -hf LiquidAI/LFM3-Omni-2B-GGUF:Q4_K_M --reasoning off --host 127.0.0.1 --port 8080
+```
+
+- `-hf repo:quant` downloads the model **and** its mmproj (vision + audio encoders) into `~/.cache/llama.cpp`.
+- `--reasoning off`: LFM3-Omni is not a reasoning model. The server README says to run it this way so turns start with an empty think block.
+- The OpenAI endpoint accepts `{"type":"image_url"}` and `{"type":"input_audio"}` content parts with data URLs or raw base64. That is exactly what Omni Pocket's `RemoteEngine` sends, so the `llamacpp` engine is the same client pointed at `127.0.0.1:8080`.
+- Speech output: `POST /tts {"input": "..."}` returns WAV from the model's speech decoder. The app uses it for *model voice*. llama-server also has a realtime WebSocket endpoint that prefills audio as it arrives, a natural next step for a lower-latency voice loop.
+
+`./scripts/run.sh --llama` wraps all of this. `scripts/llama_server.sh` sets
+threads to cores − 2 and the context to 4096, and takes `OMNI_LLAMA_NGL` for
+Vulkan/OpenCL offload.
 
 ---
 

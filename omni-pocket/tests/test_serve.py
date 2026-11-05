@@ -89,6 +89,11 @@ def test_remote_engine_against_live_server():
             time.sleep(0.05)
         eng = RemoteEngine(f"http://127.0.0.1:{port}/v1", "mock-omni")
         assert eng.health()["ok"] is True
+        from omnipocket.config import Settings, server_alive
+
+        assert server_alive(f"http://127.0.0.1:{port}/v1")
+        s = Settings(engine="auto", llama_url=f"http://127.0.0.1:{port}/v1")
+        assert s.resolve_engine() == "llamacpp"
         res = eng.generate(media_request())
         assert "100x50" in res.text and res.ttft_s is not None and res.output_tokens > 3
     finally:

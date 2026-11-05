@@ -36,6 +36,21 @@ a larger volume, set `HF_HOME=/path/to/dir`.
 
 `python -m omnipocket doctor` prints what fits on your device.
 
+## 3b. Faster: llama.cpp in proot
+
+The GGUF build through llama.cpp is much lighter than PyTorch (~1.5 GB, and
+quicker on CPU). Arch's packages may lag, so build llama.cpp v0.8.0 or newer:
+
+```bash
+sudo pacman -S --needed cmake gcc make curl openssl
+git clone --depth 1 https://github.com/ggml-org/llama.cpp ~/llama.cpp
+cmake -S ~/llama.cpp -B ~/llama.cpp/build && cmake --build ~/llama.cpp/build -j"$(nproc)" --target llama-server
+export PATH="$HOME/llama.cpp/build/bin:$PATH"
+./scripts/run.sh --llama
+```
+
+(In Termux, `pkg install llama-cpp` gives you the same thing without building.)
+
 ## 4. Run
 
 ```bash

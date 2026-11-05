@@ -2,6 +2,10 @@
 or to any server that accepts OpenAI multimodal chat messages
 (``image_url`` data URLs + ``input_audio`` WAV parts).
 
+Also the client for llama.cpp's ``llama-server`` (engine ``llamacpp``), which
+accepts the same ``image_url`` / ``input_audio`` parts. Speech output there
+comes from its ``/tts`` endpoint.
+
 Only ``requests`` is needed, so this is the lightest way to use a real model
 from Termux."""
 
@@ -65,9 +69,12 @@ class RemoteEngine:
             body["audio"] = {"format": "wav", "voice": "default"}
         return body
 
+    @property
+    def root(self) -> str:
+        return self.base_url[:-3] if self.base_url.endswith("/v1") else self.base_url
+
     def health(self) -> dict:
-        root = self.base_url[:-3] if self.base_url.endswith("/v1") else self.base_url
-        r = self.http.get(f"{root}/health", timeout=5)
+        r = self.http.get(f"{self.root}/health", timeout=5)
         r.raise_for_status()
         return r.json()
 
@@ -109,7 +116,26 @@ class RemoteEngine:
             audio = base64.b64decode(msg["audio"]["data"])
         usage = body.get("usage") or {}
         text = msg.get("content") or (msg.get("audio") or {}).get("transcript", "")
-        return OmniResult(text=text, engine=self.name, model=self.model, audio_wav=audio,
-                          prompt_tokens=usage.get("prompt_tokens"),
-                          output_tokens=usage.get("completion_tokens"),
-                          total_s=time.perf_counter() - t0)
+        res = OmniResult(text=text, engine=self.name, model=self.model, audio_wav=audio,
+                         prompt_tokens=usage.get("prompt_tokens"),
+                         output_tokens=usage.get("completion_tokens"),
+                         total_s=time.perf_counter() - t0)
+        if res.audio_wav is None and text:
+            res.audio_wav, note = self.tts(text)
+            if note:
+                res.notes.append(note)
+        return res
+
+    def tts(self, text: str, voice: str | None = None) -> tuple[bytes | None, str | None]:
+        """llama-server ``POST /tts`` -> WAV bytes (LFM3 speech decoder). Returns
+        (None, note) when the server has no speech output."""
+        body = {"input": text[:2000]}
+        if voice:
+            body["voice"] = voice
+        try:
+            r = self.http.post(f"{self.root}/tts", headers=self._headers(), json=body, timeout=self.timeout)
+        except requests.RequestException as exc:
+            return None, f"speech unavailable ({exc.__class__.__name__}) - using phone TTS"
+        if r.status_code >= 400 or not r.content[:4] == b"RIFF":
+            return None, f"speech unavailable (/tts {r.status_code}) - using phone TTS"
+        return r.content, None

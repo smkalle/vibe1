@@ -92,9 +92,10 @@ def recommend(env: str, total_mb: int, modules: dict) -> list[str]:
     total_gb = total_mb / 1024 if total_mb else 0
     if env == "termux":
         notes.append(
-            "Termux: PyTorch wheels are not on PyPI for Android/Bionic. Use the "
-            "WebGPU tab (inference in Chrome) or the remote engine; use UserLAnd "
-            "Arch or proot-distro if you want the Python baseline on the phone."
+            "Termux: run the model with llama.cpp (pkg install llama-cpp, v0.8.0+; "
+            "./scripts/run.sh --llama -> engine 'llamacpp', GGUF Q4_K_M ~1.5 GB). "
+            "PyTorch wheels are not on PyPI for Android/Bionic, so the 'transformers' "
+            "engine needs UserLAnd Arch or proot-distro."
         )
     if env == "proot":
         notes.append(
@@ -108,6 +109,10 @@ def recommend(env: str, total_mb: int, modules: dict) -> list[str]:
                 f"{dtype}: needs ~{need:.1f} GB for weights -> "
                 f"{'fits' if ok else 'too big'} in {total_gb:.1f} GB RAM"
             )
+    import shutil as _sh
+
+    if env in ("termux", "proot") and not _sh.which("llama-server"):
+        notes.append("llama-server not found: Termux -> pkg install llama-cpp; Arch -> build llama.cpp >= v0.8.0")
     if not modules.get("streamlit"):
         notes.append("streamlit is missing: run the install script for your environment.")
     if modules.get("torch") and not modules.get("transformers"):

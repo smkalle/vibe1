@@ -28,14 +28,21 @@ What it does, and why:
 | `rust`, `clang`, `ANDROID_API_LEVEL=$(getprop ro.build.version.sdk)` | A couple of Streamlit dependencies (e.g. `rpds-py`) build from source via maturin, which needs the API level |
 | `python -m venv --system-site-packages .venv` | The venv reuses the prebuilt numpy, pyarrow and pandas |
 | `pip install -r requirements.txt` | streamlit, requests (no torch) |
+| `pkg install llama-cpp` | Runs the model on the phone (needs v0.8.0+ for LFM3-Omni; Termux has 0.9.0) |
 
 Expect 10–20 minutes the first time. Keep the phone plugged in. `CARGO_BUILD_JOBS=2` keeps it from throttling.
 
 ## 3. Run
 
 ```bash
-./scripts/run.sh
+./scripts/run.sh --llama
 ```
+
+`--llama` starts `llama-server` in the background with
+`LiquidAI/LFM3-Omni-2B-GGUF:Q4_K_M`. The first run downloads about 1.5 GB
+(model + multimodal projector) into `~/.cache/llama.cpp`, so use Wi-Fi. Follow
+it with `tail -f omni_data/llama-server.log`. The app then uses the
+**llamacpp** engine. Stop the server with `./scripts/llama_server.sh --stop`.
 
 This takes a wake-lock, starts Streamlit on `127.0.0.1:8501`, and opens
 Chrome via `termux-open-url`. Always use **`http://localhost:8501`**:
@@ -43,7 +50,10 @@ camera, mic and WebGPU are only allowed in a secure context.
 
 ## 4. Choose how the model runs
 
-- **Live (WebGPU) tab**: tap *Check WebGPU*, then *Load model*. The ~1.6 GB download is cached by Chrome. After that, *Start camera* and *Hold to talk*.
+- **llamacpp engine (recommended)**: the model runs on the phone CPU through llama.cpp, as above. Photos, voice and text all work in the Ask tab. *Read answers aloud with → model voice* uses llama-server's `/tts`.
+  - Tuning: `OMNI_LLAMA_THREADS=6` (default: cores − 2), `OMNI_LLAMA_CTX=8192` for longer audio, `OMNI_GGUF=LiquidAI/LFM3-Omni-2B-GGUF:Q8_0` for quality if you have RAM.
+  - GPU offload (experimental on phones): `pkg install llama-cpp-backend-vulkan` (or `-opencl` for Adreno), then `OMNI_LLAMA_NGL=99 ./scripts/run.sh --llama`. Compare against the CPU in the Benchmarks tab; on many phones the CPU is faster.
+- **Live (WebGPU) tab**: *Check WebGPU* and the GPU benchmark work. *Load model* currently fails with `Unsupported model type: lfm3_omni`, because no transformers.js release supports the model yet.
 - **Remote engine**: run `./scripts/serve_gpu.sh` on your PC (see DEPLOY.md), then on the phone:
   ```bash
   OMNI_ENGINE=remote OMNI_REMOTE_URL=http://192.168.1.20:8088/v1 OMNI_REMOTE_API_KEY=... ./scripts/run.sh

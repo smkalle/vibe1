@@ -100,42 +100,52 @@ Media prep (`omnipocket/media.py`): phone photos are EXIF-rotated and downscaled
 [huggingface.co/spaces/LiquidAI/LFM3-Omni-2B-WebGPU](https://huggingface.co/spaces/LiquidAI/LFM3-Omni-2B-WebGPU)
 (about 1.6 GB download, then fully local). It works in Chrome on Android 12+ with a recent Adreno or Mali GPU.
 
-The export lives at `LiquidAI/LFM3-Omni-2B-ONNX`. The model card's WebGPU notes say:
+The export lives at `LiquidAI/LFM3-Omni-2B-ONNX`. Two facts decide how to run it in a browser:
 
-1. Use **`onnxruntime-web/webgpu`** (transformers.js wraps it).
-2. Pair the **`decoder_q4f16`** graph with the **float32 side graphs** (embeddings, vision encoder, audio encoder). Quantising the small encoders saves little memory and costs accuracy.
-3. **Chunk prefill to ≤ 1024 tokens.** Long image+audio prompts in one pass can blow WebGPU buffer limits on mobile.
+- **transformers.js cannot load it.** Loading the repo with transformers.js fails with
+  `Unsupported model type: lfm3_omni`. That's not a missing version: LiquidAI's exporter README
+  ([Liquid4All/onnx-export](https://github.com/Liquid4All/onnx-export)) says the LFM3 exports are
+  "not loadable by Transformers.js". They are plain ONNX graphs driven by LiquidAI's own generation
+  loop (`liquidonnx.lfm3_omni.session`), on plain onnxruntime.
+- **The README's section 4.6 gives the WebGPU recipe**, checked by their `tests/web` suite:
+  1. `import * as ort from 'onnxruntime-web/webgpu'` (the native WebGPU EP; the default import's JSEP can't run the q4 decoders) and `executionProviders: [{ name: 'webgpu', enableMatmulFp32Accumulation: true }]`.
+  2. Run `decoder_q4f16.onnx` with the **q4 bundle's side graphs**: `vision_encoder_q8.onnx` and `audio_encoder.onnx`. Use `decoder_q4.onnx` on GPUs without `shader-f16`.
+  3. **Prefill in chunks of at most 1024 tokens.** Past the 256-token sliding window, a long single prefill overflows a 4 GiB buffer or returns non-finite logits.
 
 The custom WGSL kernels Xenova used for the headline speeds (about 280 tok/s on an M4 Max) live at
 [huggingface.co/webgpu-kernels](https://huggingface.co/webgpu-kernels) and load through `@huggingface/kernels`.
 
-> **Status, Nov 2026:** the published transformers.js releases (≤ 4.3.2,
-> 4.4.0-next.0) support `lfm3` and `lfm3_vl` but not `lfm3_omni`, so loading
-> the ONNX repo fails with `Unsupported model type: lfm3_omni`. The official
-> demo Space works because it ships its own build. Until a release adds the
-> type, the practical on-phone path is llama.cpp (section 3b).
+**In this repo:** `omnipocket/webgpu/lfm3omni.js` is a JavaScript port of the text-answer path of
+LiquidAI's runtime, on onnxruntime-web:
 
-**In this repo:** the **Live (WebGPU)** tab is a bidirectional Streamlit
-component (`omnipocket/webgpu/index.html`). It has no npm build, because it
-speaks Streamlit's `postMessage` protocol directly. It does three things:
+| Python (`liquidonnx`) | JS (`lfm3omni.js`) |
+|---|---|
+| `lfm3_audio.session.log_mel`, `mel_filters` (slaney, 128 bins, n_fft 400, hop 160) | `logMel`, `melFilters` |
+| `Qwen2VLImageProcessor` (`smart_resize` to multiples of 32, normalize, block-major patches) | `smartResize`, `patchify` |
+| `prompt_ids` / `expand_image_tokens` | `expandPrompt` |
+| `lfm3.session.CachedDecoder` + `generate_ids` (text mode) | `LFM3OmniRuntime.generate` |
 
-1. **Device check**: `navigator.gpu` adapter, vendor/architecture, `shader-f16` (required for q4f16), `maxBufferSize`, `maxStorageBufferBindingSize`, and secure-context status.
-2. **Matmul benchmark**: a tiled 1024² WGSL matmul in f32 and f16, reported in GFLOP/s. Use it to compare phones and to confirm you really are on the GPU.
-3. **Live agent**: dynamically imports `@huggingface/transformers@<version>`, loads the ONNX repo with `device: "webgpu"` and a per-graph `dtype` map, and streams the answer.
+The decoder loop is the interesting part:
 
 ```js
-const TJS = await import(`https://cdn.jsdelivr.net/npm/@huggingface/transformers@${ver}`);
-const processor = await TJS.AutoProcessor.from_pretrained(modelId);
-const model = await TJS[cls].from_pretrained(modelId, {
-  device: "webgpu",
-  dtype: { decoder_model_merged: "q4f16", embed_tokens: "fp32", vision_encoder: "fp32", audio_encoder: "fp32" },
-});
+// every step: input_ids, attention_mask (past + n), position_ids, logits_to_keep,
+// image/audio feature rows for the placeholders in this chunk, and the caches
+const out = await decoder.run(feed, ["logits", ...cacheOutputs]);
+// present_conv.N -> past_conv.N, present.N.key -> past_key_values.N.key
+// (kept on the GPU between steps: preferredOutputLocation "gpu-buffer")
+token = argmax(logits, suppress = {<|image|>, <|video|>, <|audio|>, <|audio_out|>, <|mixed_start|>, <|audio_start|>})
+// stop at <|im_end|> or <|text_end|>
 ```
 
-The transformers.js version, model class and dtype map are sidebar settings,
-not hard-coded, so you can match whatever the ONNX model card specifies. The
-results (probe, GFLOP/s, TTFT, tok/s) flow back to Python and land in the
-Benchmarks tab.
+The vision encoder takes one image's patches as `[h/2, w/2, 2, 2, 1536]`. The audio encoder takes
+`[1, 128, frames]` log-mel features and returns one row per 8 mel frames. The prompt follows the
+model's chat template with thinking off: each image becomes `<|vision_start|><|image|><|vision_end|>`
+and each clip `<|vision_start|><|audio|><|vision_end|>`, expanded to one placeholder per feature row.
+transformers.js is used only for the tokenizer.
+
+The Live tab adds a WebGPU device check (adapter, `shader-f16`, buffer limits), a WGSL matmul
+benchmark, and the camera + hold-to-talk loop. Not ported yet: speech output (the MaskGIT depth
+decoder and the codec), so answers are spoken by the phone's TTS.
 
 **Why Streamlit is still useful here:** Python serves the page from
 `localhost` (a secure context, so camera, mic and WebGPU are allowed), keeps
@@ -233,8 +243,9 @@ too weak.
 
 | Variant | Where | Notes |
 |---|---|---|
-| q4f16 decoder + fp32 side graphs | WebGPU | Card's recommendation. Needs `shader-f16` (the Device check shows it) |
-| q4 (no f16) | WebGPU without `shader-f16` | Set dtype to `"q4"` in the sidebar |
+| `decoder_q4f16` + q4 bundle side graphs (`vision_encoder_q8`, `audio_encoder`) | WebGPU | onnx-export README 4.6. Needs `shader-f16` (the Device check shows it) |
+| `decoder_q4` + the same side graphs | WebGPU without `shader-f16` | The sidebar's *Decoder: auto* picks it |
+| GGUF Q4_K_M + Q8_0 mmproj | llama.cpp (CPU, optional Vulkan/OpenCL) | Section 3b |
 | bfloat16 | CPU (UserLAnd), CUDA | ~4.4 GB. Default for the transformers engine here |
 | float32 | CPU reference | ~8.7 GB. Correctness baseline only |
 

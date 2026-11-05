@@ -53,7 +53,7 @@ camera, mic and WebGPU are only allowed in a secure context.
 - **llamacpp engine (recommended)**: the model runs on the phone CPU through llama.cpp, as above. Photos, voice and text all work in the Ask tab. *Read answers aloud with → model voice* uses llama-server's `/tts`.
   - Tuning: `OMNI_LLAMA_THREADS=6` (default: cores − 2), `OMNI_LLAMA_CTX=8192` for longer audio, `OMNI_GGUF=LiquidAI/LFM3-Omni-2B-GGUF:Q8_0` for quality if you have RAM.
   - GPU offload (experimental on phones): `pkg install llama-cpp-backend-vulkan` (or `-opencl` for Adreno), then `OMNI_LLAMA_NGL=99 ./scripts/run.sh --llama`. Compare against the CPU in the Benchmarks tab; on many phones the CPU is faster.
-- **Live (WebGPU) tab**: *Check WebGPU* and the GPU benchmark work. *Load model* currently fails with `Unsupported model type: lfm3_omni`, because no transformers.js release supports the model yet.
+- **Live (WebGPU) tab**: the model runs in Chrome on the phone GPU, with nothing in Python. Tap *Check WebGPU*, then *Load model*. That downloads the decoder (q4f16, or q4 without `shader-f16`) and, on first use, the vision and audio encoders from `LiquidAI/LFM3-Omni-2B-ONNX`; Chrome caches them. Then *Start camera*, *Hold to talk*. Answers are text, read aloud by the phone's TTS. Lower *Max image tokens* in the sidebar if prefill is slow.
 - **Remote engine**: run `./scripts/serve_gpu.sh` on your PC (see DEPLOY.md), then on the phone:
   ```bash
   OMNI_ENGINE=remote OMNI_REMOTE_URL=http://192.168.1.20:8088/v1 OMNI_REMOTE_API_KEY=... ./scripts/run.sh

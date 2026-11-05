@@ -28,7 +28,7 @@ Everything stays on your devices. Logs live in `omni_data/` and media is never s
 | You have | Engine | Where the model runs |
 |---|---|---|
 | **Termux** (recommended) | `llamacpp`: `./scripts/run.sh --llama` | Phone CPU, llama.cpp + official GGUF Q4_K_M (~1.5 GB) |
-| Termux + Chrome 121+ | **Live (WebGPU)** tab | Phone GPU in the browser. **Blocked for now**: no transformers.js release supports `lfm3_omni` yet (see below) |
+| Termux + Chrome 121+ with WebGPU | **Live (WebGPU)** tab | Phone GPU in the browser: LiquidAI's ONNX export (q4f16/q4) on onnxruntime-web, through Omni Pocket's port of their runtime |
 | Termux + a **PC with a GPU** | `remote` | PC, via `python -m omnipocket serve` (OpenAI-compatible) |
 | **UserLAnd / proot Arch**, ≥ 8 GB RAM | `transformers` | Phone CPU, bfloat16 (slow but fully local Python) |
 | Just exploring | `mock` | Nowhere (offline echo; exercises the whole UI) |
@@ -89,7 +89,8 @@ python -m omnipocket serve --engine transformers --host 0.0.0.0 --port 8088
 | `OMNI_GGUF` · `OMNI_LLAMA_CTX` · `OMNI_LLAMA_THREADS` · `OMNI_LLAMA_NGL` · `OMNI_LLAMA_ARGS` | `LiquidAI/LFM3-Omni-2B-GGUF:Q4_K_M` · 4096 · cores−2 · 0 · | `scripts/llama_server.sh` settings |
 | `OMNI_MODEL_ID` | `LiquidAI/LFM3-Omni-2B` | HF repo for the transformers engine |
 | `OMNI_ONNX_MODEL_ID` | `LiquidAI/LFM3-Omni-2B-ONNX` | ONNX repo for the WebGPU tab |
-| `OMNI_TRANSFORMERS_JS` | `4.3.2` | transformers.js version loaded in the browser |
+| `OMNI_ORT_WEB` | `1.30.0` | onnxruntime-web version for the WebGPU tab (the one LiquidAI's browser tests pin) |
+| `OMNI_TRANSFORMERS_JS` | `4.3.2` | transformers.js version, used only for the tokenizer in the WebGPU tab |
 | `OMNI_REMOTE_URL` / `OMNI_REMOTE_MODEL` / `OMNI_REMOTE_API_KEY` | | Remote engine target (the key is never written to disk) |
 | `OMNI_DEVICE` / `OMNI_DTYPE` | `auto` | transformers engine (`auto` dtype = bfloat16) |
 | `OMNI_MAX_NEW_TOKENS` | `256` | Generation budget |
@@ -104,12 +105,14 @@ app.py                       Streamlit UI (Ask · Live (WebGPU) · Benchmarks ·
 omnipocket/
   engines/{mock,remote,transformers_engine}.py   one contract: generate() + stream()
   webgpu/index.html          bidirectional Streamlit component (no npm build): probe, matmul bench, live agent
+  webgpu/lfm3omni.js         LFM3-Omni runtime for onnxruntime-web: port of LiquidAI's liquidonnx loop
   serve.py                   OpenAI-compatible FastAPI server around any engine
   media.py                   EXIF-aware image prep; WAV decode/resample to 16 kHz with numpy only
   presets.py · history.py · platform.py · cli.py · config.py
 scripts/                     install_{termux,userland_arch,desktop}.sh, run.sh, llama_server.sh, serve_gpu.sh,
                              termux_boot.sh, smoke_test.sh, update.sh
-tests/                       45 offline tests (engines, server round-trip, media, AppTest UI)
+tests/                       45 offline Python tests (engines, server round-trip, media, AppTest UI)
+tests/js/                    lfm3omni.js checks: pure helpers vs transformers, toy bundle on ort-web (Node + WebGPU)
 ```
 
 ## Status and honesty notes
@@ -117,5 +120,8 @@ tests/                       45 offline tests (engines, server round-trip, media
 - **Verified here**: the full test suite. A real HTTP round trip from phone client → server → engine. The UI on a Pixel-7 viewport in headless Chromium. The WebGPU probe sending results back to Python. The WGSL matmul benchmark.
 - **Checked against llama.cpp source** (v0.9.0 / master, Nov 2026): LFM3-Omni support, the `-hf`, `--reasoning off`, `-c`, `-t` and `-ngl` flags, `image_url`/`input_audio` parsing (data URLs or raw base64), `/health` and `/tts`. Termux's `llama-cpp` package is 0.9.0.
 - **Not verified here**: running the real model weights. Hugging Face was unreachable from the build sandbox. The transformers engine follows the model card's Python interface as given.
-- **WebGPU model loading is blocked upstream**: transformers.js 4.3.2 and 4.4.0-next.0 know `lfm3` and `lfm3_vl` but not `lfm3_omni`, so *Load model* fails with `Unsupported model type: lfm3_omni`. The device check and GPU benchmark still work. When a release adds the type, set its version in the sidebar.
+- **WebGPU tab**: transformers.js can't load LiquidAI's ONNX export (`Unsupported model type: lfm3_omni`; their README says the exports are "not loadable by Transformers.js"). So `lfm3omni.js` ports the text-answer path of LiquidAI's own runtime ([Liquid4All/onnx-export](https://github.com/Liquid4All/onnx-export), `liquidonnx.lfm3_omni`) to onnxruntime-web, using the graphs and settings of that README's WebGPU section. Checked here:
+  - **Pure parts** match their references exactly or within 1e-4: mel filter bank and log-mel (transformers / numpy), `smart_resize` and patchify (transformers' Qwen2-VL processor with LFM3-Omni-2B's settings), and the prompt (LFM3-Omni-2B's real `chat_template.jinja`).
+  - **The decoder loop**: feeds, external weights, cache handoff, placeholder scatter, chunked prefill and suppression. It reproduces a NumPy reference token for token on a toy model with the real decoder's interface, both on onnxruntime-web's wasm backend in Node and on its WebGPU EP in headless Chromium.
+  - **Not yet checked**: LiquidAI's real graphs, whether the tiny export or the 2B weights. Hugging Face is unreachable from the build sandbox. `tests/js/make_reference.py` plus `browser_check.mjs` compare against LiquidAI's own Python runtime once you can run their exporter. Speech output (depth decoder + codec) is not ported.
 - **Model-native speech output** (`speech: model voice`) is experimental. When it isn't available, answers are spoken by the phone's TTS (browser `speechSynthesis` or `termux-tts-speak`).

@@ -42,8 +42,10 @@
 
 <section id="live-card">
   <h3>2 · Live camera + voice agent (in-browser model)</h3>
-  <p class="muted">Downloads the ONNX model once (~1.6 GB, cached by the browser), then runs offline on the phone GPU.
-    <b>Experimental:</b> needs a transformers.js build that supports the model; if loading fails, use the official demo link above.</p>
+  <p class="muted">Runs LiquidAI's ONNX export with onnxruntime-web on the phone GPU (a port of their
+    Python runtime; transformers.js cannot load these files). Downloads the decoder + vision encoder once
+    (the audio encoder only when you first speak), cached by the browser, then works offline. Text answers;
+    speech via the phone's TTS.</p>
   <div class="row">
     <button class="primary" id="btn-load">Load model</button>
     <button id="btn-cam">Start camera</button>
@@ -59,6 +61,7 @@
   <div class="row">
     <button id="btn-mic" disabled>Hold to talk</button>
     <button class="primary" id="btn-ask" disabled>Ask</button>
+    <button id="btn-stop">Stop</button>
     <label class="muted"><input type="checkbox" id="chk-frame" checked> include camera frame</label>
     <label class="muted"><input type="checkbox" id="chk-speak"> speak answer</label>
   </div>
@@ -215,49 +218,57 @@ $("btn-probe").onclick = probe;
 $("btn-bench").onclick = bench;
 
 // ---------------------------------------------------------------------------
-// 2. Live agent
+// 2. Live agent: LiquidAI ONNX export on onnxruntime-web (./lfm3omni.js)
 // ---------------------------------------------------------------------------
-let TJS = null, model = null, processor = null;
-let stream = null, facing = "environment";
+import * as L from "./lfm3omni.js";
+let runtime = null, tokenizer = null, bundleName = "";
+
+function chooseBundle(precision) {
+  const f16 = !!gpuAdapter && gpuAdapter.features.has("shader-f16");
+  const p = precision === "auto" ? (f16 ? "q4f16" : "q4") : precision;
+  // README 4.6 of Liquid4All/onnx-export: q4f16 (or q4) decoder with the q4 bundle's side graphs
+  return { name: p, bundle: { decoder: `decoder_${p}.onnx`, vision_encoder: "vision_encoder_q8.onnx", audio_encoder: "audio_encoder.onnx" } };
+}
 
 async function loadModel() {
   $("btn-load").disabled = true;
-  const ver = ARGS.transformers_js || "4.3.2";
-  const modelId = ARGS.onnx_model_id || "LiquidAI/LFM3-Omni-2B-ONNX";
   const status = (t) => ($("load-status").textContent = t);
+  const repo = ARGS.onnx_model_id || L.DEFAULTS.repo;
+  const ortVer = ARGS.ort_version || "1.30.0";
+  const tjsVer = ARGS.transformers_js || "4.3.2";
   try {
-    status(`Importing transformers.js@${ver} ...`);
-    TJS = await import(`https://cdn.jsdelivr.net/npm/@huggingface/transformers@${ver}`);
-    // Model class name differs between transformers.js releases; use the first one present.
-    const cls = (ARGS.model_class ? [ARGS.model_class] : [])
-      .concat(["AutoModelForMultimodalLM", "AutoModelForImageTextToText", "AutoModelForVision2Seq"])
-      .find((n) => TJS[n]);
-    if (!cls) throw new Error("this transformers.js build has no multimodal model class");
-    let dtype = ARGS.dtype || "q4f16";
-    try { dtype = JSON.parse(dtype); } catch (_) { /* plain string like "q4f16" */ }
-    const files = {};
+    if (!gpuAdapter) await probe();
+    if (!gpuAdapter) throw new Error("WebGPU is not available in this browser");
+    status(`Importing onnxruntime-web@${ortVer} (WebGPU) ...`);
+    const ortBase = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ortVer}/dist/`;
+    const ort = await import(`${ortBase}ort.webgpu.min.mjs`);
+    ort.env.wasm.wasmPaths = ortBase;
+    status(`Loading tokenizer (transformers.js@${tjsVer}, tokenizer only) ...`);
+    const TJS = await import(`https://cdn.jsdelivr.net/npm/@huggingface/transformers@${tjsVer}`);
+    tokenizer = await TJS.AutoTokenizer.from_pretrained(repo);
+    const { name, bundle } = chooseBundle(ARGS.precision || "auto");
+    bundleName = name;
     const bar = $("load-progress"); bar.hidden = false;
-    const progress_callback = (p) => {
-      if (p.status === "progress" && p.total) {
-        files[p.file] = [p.loaded, p.total];
-        const [l, t] = Object.values(files).reduce(([a, b], [x, y]) => [a + x, b + y], [0, 0]);
-        bar.value = (100 * l) / t;
-        status(`Downloading ${(l / 1e9).toFixed(2)} / ${(t / 1e9).toFixed(2)} GB (cached after first run)`);
-      }
-    };
+    const src = L.huggingFaceSource(repo, {
+      onProgress: (file, loaded, total, cached) => {
+        if (total) bar.value = (100 * loaded) / total;
+        status(`${cached ? "Reading cached" : "Downloading"} ${file}: ${(loaded / 1e6).toFixed(0)}${total ? " / " + (total / 1e6).toFixed(0) : ""} MB`);
+      },
+    });
+    runtime = new L.LFM3OmniRuntime(ort, {
+      executionProvider: "webgpu", bundle, ...src,
+      maxImageTokens: ARGS.max_image_tokens || L.DEFAULTS.maxImageTokens,
+      prefillChunk: ARGS.prefill_chunk || L.DEFAULTS.prefillChunk,
+    });
     const t0 = performance.now();
-    processor = await TJS.AutoProcessor.from_pretrained(modelId, { progress_callback });
-    model = await TJS[cls].from_pretrained(modelId, { device: "webgpu", dtype, progress_callback });
-    const secs = (performance.now() - t0) / 1000;
+    await runtime.load(status);
     bar.hidden = true;
-    status(`Loaded ${modelId} with ${cls} on WebGPU in ${secs.toFixed(1)} s.`);
+    const secs = (performance.now() - t0) / 1000;
+    status(`Ready: ${repo} (${name} decoder) on WebGPU, loaded in ${secs.toFixed(1)} s. The vision/audio encoders load on first use.`);
     $("btn-ask").disabled = false; $("btn-mic").disabled = false;
-    setValue({ kind: "model_loaded", model: modelId, cls, load_s: +secs.toFixed(1), transformers_js: ver });
+    setValue({ kind: "model_loaded", model: repo, bundle: name, load_s: +secs.toFixed(1), ort: ortVer });
   } catch (e) {
-    const unsupported = /Unsupported model type/i.test(String(e.message));
-    status("Load failed: " + e.message + (unsupported
-      ? "  ->  transformers.js has no LFM3-Omni support yet. Use the llamacpp engine (./scripts/run.sh --llama) or the official demo."
-      : "  ->  check the transformers.js version / dtype in the sidebar, or use the official demo."));
+    status("Load failed: " + (e.message || e));
     $("btn-load").disabled = false;
     setValue({ kind: "error", where: "load", message: String(e.message || e) });
   }
@@ -272,15 +283,6 @@ async function startCamera() {
   } catch (e) {
     $("load-status").textContent = "Camera error: " + e.message;
   }
-}
-
-function grabFrame(maxSide = 640) {
-  const v = $("video");
-  if (!stream || !v.videoWidth) return null;
-  const s = Math.min(1, maxSide / Math.max(v.videoWidth, v.videoHeight));
-  const c = $("snap"); c.width = Math.round(v.videoWidth * s); c.height = Math.round(v.videoHeight * s);
-  c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
-  return c;
 }
 
 // --- microphone: record, decode, resample to 16 kHz mono Float32 ---------
@@ -308,43 +310,64 @@ async function micUp() {
 }
 
 // --- inference ------------------------------------------------------------
-let busy = false;
+let busy = false, stopRequested = false;
+
+/** Camera frame -> smart_resize'd canvas pixels -> pixel_values + grid. */
+function framePixels() {
+  const v = $("video");
+  if (!stream || !v.videoWidth) return null;
+  const cfg = runtime.image;
+  const [h, w] = L.smartResize(v.videoHeight, v.videoWidth, cfg.patch * cfg.merge, cfg.minPixels, cfg.maxPixels);
+  const c = $("snap"); c.width = w; c.height = h;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(v, 0, 0, w, h);
+  return L.patchify(ctx.getImageData(0, 0, w, h).data, w, h, cfg, 4);
+}
+
 async function ask() {
-  if (!model || busy) return;
-  busy = true; $("btn-ask").disabled = true;
+  if (!runtime || busy) return;
+  busy = true; stopRequested = false; $("btn-ask").disabled = true;
   const typed = $("prompt").value.trim();
-  const frame = $("chk-frame").checked ? grabFrame() : null;
-  const content = [];
-  if (frame) content.push({ type: "image" });
-  if (lastAudio) content.push({ type: "audio" });
-  if (typed) content.push({ type: "text", text: typed });
-  if (!content.length) { busy = false; $("btn-ask").disabled = false; return; }
-  const messages = [{ role: "system", content: ARGS.system || "You are a helpful assistant. Answer briefly." },
-                    { role: "user", content }];
-  $("answer").textContent = ""; $("stats").textContent = "Prefilling...";
-  const t0 = performance.now(); let tFirst = null, nTok = 0;
+  const audio = lastAudio; lastAudio = null;
+  const t0 = performance.now();
   try {
-    const prompt = processor.apply_chat_template(messages, { add_generation_prompt: true });
-    const image = frame ? await TJS.RawImage.fromCanvas(frame) : null;
-    const inputs = await processor(prompt, image, lastAudio, { add_special_tokens: false });
-    const streamer = new TJS.TextStreamer(processor.tokenizer, {
-      skip_prompt: true, skip_special_tokens: true,
-      callback_function: (t) => { $("answer").textContent += t; },
-      token_callback_function: () => { nTok++; if (tFirst === null) tFirst = performance.now(); },
+    const frame = $("chk-frame").checked ? framePixels() : null;
+    if (!frame && !audio && !typed) return;
+    $("answer").textContent = ""; $("stats").textContent = "Encoding...";
+    const imageFeatures = frame ? await runtime.encodeImage(frame.pixelValues, frame.grid) : null;
+    const audioFeatures = audio ? await runtime.encodeAudio(audio) : null;
+    const audioTokens = audio ? [L.numAudioTokens(L.numFrames(audio.length, runtime.mel), runtime.mel)] : [];
+    const tEnc = performance.now();
+    const prompt = L.buildPrompt({ system: ARGS.system || "", images: frame ? 1 : 0, audios: audio ? 1 : 0, text: typed });
+    const raw = Array.from(tokenizer.encode(prompt, { add_special_tokens: false }), Number);
+    const ids = runtime.expandPrompt(raw, frame ? [frame.grid] : [], audioTokens);
+    $("stats").textContent = `Prefilling ${ids.length} tokens...`;
+    let tFirst = null;
+    const gen = await runtime.generate(ids, {
+      imageFeatures, audioFeatures, maxNewTokens: ARGS.max_new_tokens || 256,
+      shouldStop: () => stopRequested,
+      onToken: (_tok, sofar) => {
+        if (tFirst === null) tFirst = performance.now();
+        // decode the whole answer each step: multi-byte characters span tokens
+        $("answer").textContent = tokenizer.decode(sofar, { skip_special_tokens: true });
+      },
     });
-    await model.generate({ ...inputs, max_new_tokens: ARGS.max_new_tokens || 256, do_sample: false, streamer });
+    const text = tokenizer.decode(gen.tokens, { skip_special_tokens: true }).trim();
+    $("answer").textContent = text;
     const total = (performance.now() - t0) / 1000, ttft = ((tFirst ?? performance.now()) - t0) / 1000;
-    const tps = nTok > 1 ? (nTok - 1) / Math.max(1e-3, total - ttft) : null;
-    $("stats").textContent = `TTFT ${ttft.toFixed(2)} s · ${nTok} tokens · ${tps ? tps.toFixed(1) : "?"} tok/s · total ${total.toFixed(1)} s`;
-    const text = $("answer").textContent;
-    if ($("chk-speak").checked && "speechSynthesis" in window) speechSynthesis.speak(new SpeechSynthesisUtterance(text));
-    setValue({ kind: "answer", text, ttft_s: +ttft.toFixed(3), total_s: +total.toFixed(3), output_tokens: nTok,
-               tokens_per_s: tps ? +tps.toFixed(2) : null, mode: content.map((c) => c.type).join("+") });
+    const n = gen.tokens.length, decodeS = total - ttft;
+    const tps = n > 1 && decodeS > 0 ? (n - 1) / decodeS : null;
+    $("stats").textContent = `encode ${((tEnc - t0) / 1000).toFixed(2)} s · prefill ${ids.length} tok ${(gen.prefillMs / 1000).toFixed(2)} s · TTFT ${ttft.toFixed(2)} s · ${n} tokens · ${tps ? tps.toFixed(1) : "?"} tok/s · ${bundleName}`;
+    if ($("chk-speak").checked && "speechSynthesis" in window && text) { speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance(text)); }
+    const mode = [frame && "image", audio && "audio", typed && "text"].filter(Boolean).join("+");
+    setValue({ kind: "answer", text, ttft_s: +ttft.toFixed(3), total_s: +total.toFixed(3), output_tokens: n,
+               prompt_tokens: ids.length, tokens_per_s: tps ? +tps.toFixed(2) : null, mode, bundle: bundleName });
   } catch (e) {
-    $("stats").textContent = "Generation failed: " + e.message;
+    $("stats").textContent = "Generation failed: " + (e.message || e);
     setValue({ kind: "error", where: "generate", message: String(e.message || e) });
   } finally {
-    lastAudio = null; busy = false; $("btn-ask").disabled = false;
+    busy = false; $("btn-ask").disabled = false;
   }
 }
 
@@ -352,6 +375,7 @@ $("btn-load").onclick = loadModel;
 $("btn-cam").onclick = startCamera;
 $("btn-flip").onclick = () => { facing = facing === "environment" ? "user" : "environment"; startCamera(); };
 $("btn-ask").onclick = ask;
+$("btn-stop").onclick = () => { stopRequested = true; if ("speechSynthesis" in window) speechSynthesis.cancel(); };
 const mic = $("btn-mic");
 mic.addEventListener("pointerdown", (e) => { e.preventDefault(); micDown(); });
 ["pointerup", "pointerleave", "pointercancel"].forEach((ev) => mic.addEventListener(ev, micUp));

@@ -72,14 +72,17 @@ with st.sidebar:
     speech_mode = st.selectbox("Read answers aloud with", speech_modes, index=1)
 
     st.header("In-browser (WebGPU)")
-    tjs_version = st.text_input("transformers.js version", BASE.transformers_js_version)
     onnx_id = st.text_input("ONNX model id", BASE.onnx_model_id)
-    dtype_map = st.text_area(
-        "dtype (string or JSON per graph)",
-        '{"decoder_model_merged": "q4f16", "embed_tokens": "fp32", '
-        '"vision_encoder": "fp32", "audio_encoder": "fp32"}',
-        help="Model card: pair the q4f16 decoder with float32 side graphs. "
-             "Use plain \"q4\" if your GPU lacks shader-f16.")
+    web_precision = st.selectbox(
+        "Decoder", ["auto", "q4f16", "q4"],
+        help="auto = q4f16 when the GPU has shader-f16, else q4. Both use the q4 bundle's side graphs "
+             "(vision_encoder_q8, audio_encoder), as LiquidAI's onnx-export README 4.6 recommends.")
+    max_image_tokens = st.select_slider("Max image tokens", [64, 128, 256, 512, 1024], value=256,
+                                        help="Smaller = faster prefill. The processor allows up to 2048.")
+    prefill_chunk = st.select_slider("Prefill chunk (tokens)", [256, 512, 1024], value=1024,
+                                     help="README 4.6: prefill q4f16 decoders in chunks of at most 1024.")
+    ort_version = st.text_input("onnxruntime-web version", BASE.ort_web_version)
+    tjs_version = st.text_input("transformers.js version (tokenizer only)", BASE.transformers_js_version)
     st.caption(f"Omni Pocket v{__version__} · data in `{BASE.data_dir}/`")
 
 
@@ -239,18 +242,21 @@ with tab_live:
         "secure context."
     )
     st.info(
-        "**Status (Nov 2026):** no published transformers.js release (≤ 4.3.2, 4.4.0-next.0) knows the "
-        "`lfm3_omni` model type yet, so *Load model* fails with *Unsupported model type*. The device check "
-        "and GPU benchmark work. To run the real model on the phone today, use the **llamacpp** engine "
-        "(`./scripts/run.sh --llama`), or the official demo below.",
+        "transformers.js cannot load LiquidAI's ONNX export (*Unsupported model type: lfm3_omni*; their "
+        "README: \"not loadable by Transformers.js\"), so this tab runs **Omni Pocket's port of LiquidAI's "
+        "own runtime** on onnxruntime-web/WebGPU: text answers to camera + voice + text. "
+        "It is new: if it fails on your phone, the **llamacpp** engine runs the same model natively.",
         icon="ℹ️",
     )
     st.link_button("Open the official LFM3-Omni WebGPU demo", OFFICIAL_WEBGPU_DEMO, use_container_width=True)
     event = webgpu_panel(
         key="webgpu",
         transformers_js=tjs_version.strip(),
+        ort_version=ort_version.strip(),
         onnx_model_id=onnx_id.strip(),
-        dtype=dtype_map.strip(),
+        precision=web_precision,
+        max_image_tokens=max_image_tokens,
+        prefill_chunk=prefill_chunk,
         system=system_prompt(BY_KEY["look"], speak=speech_mode != "off"),
         max_new_tokens=max_new,
         speak=speech_mode != "off",
@@ -263,7 +269,8 @@ with tab_live:
         elif kind == "gpu_bench":
             st.session_state.webgpu_bench = event["results"]
         elif kind == "answer":
-            BENCH.append({"engine": "webgpu", "model": onnx_id, "mode": event.get("mode", ""), "source": "live",
+            BENCH.append({"engine": "webgpu", "model": f"{onnx_id} {event.get('bundle', '')}".strip(),
+                          "mode": event.get("mode", ""), "source": "live",
                           "ttft_s": event.get("ttft_s"), "total_s": event.get("total_s"),
                           "output_tokens": event.get("output_tokens"), "tokens_per_s": event.get("tokens_per_s")})
             HISTORY.append({"engine": "webgpu", "preset": "live", "mode": event.get("mode", ""),
@@ -274,9 +281,8 @@ with tab_live:
     if st.session_state.get("webgpu_error"):
         err = st.session_state.webgpu_error
         msg = str(err.get("message", ""))
-        if "Unsupported model type" in msg:
-            st.error(f"{msg} — this transformers.js build cannot run LFM3-Omni. Switch the sidebar engine to "
-                     "**llamacpp** and run `./scripts/llama_server.sh`, then use the Ask tab.")
+        if "WebGPU is not available" in msg or "shader" in msg.lower():
+            st.error(f"{msg} — use the **llamacpp** engine (`./scripts/run.sh --llama`) on this phone.")
         else:
             st.warning(f"Browser engine error during {err.get('where')}: {msg}")
 
@@ -332,7 +338,7 @@ with tab_device:
     st.markdown(
         "| You have | Use |\n|---|---|\n"
         "| Termux (any phone, 6 GB+ RAM) | **llamacpp** — `./scripts/run.sh --llama` (GGUF Q4_K_M on the CPU) |\n"
-        "| Termux only, Chrome 121+ | **Live (WebGPU)** tab — waiting for transformers.js `lfm3_omni` support |\n"
+        "| Termux + Chrome 121+ with WebGPU | **Live (WebGPU)** tab — LiquidAI's ONNX export on the phone GPU |\n"
         "| Termux + a PC with a GPU | **remote** engine → `python -m omnipocket serve` on the PC |\n"
         "| UserLAnd / proot Arch, ≥ 8 GB RAM | **transformers** engine (bfloat16, CPU, slow but fully local) |\n"
         "| Just trying the UI | **mock** engine |"

@@ -34,9 +34,8 @@ class Settings:
     dtype: str = "auto"  # auto | bfloat16 | float16 | float32
     max_new_tokens: int = 256
     data_dir: Path = Path("omni_data")
-    # transformers.js build for the in-browser engine. Pin the version the
-    # ONNX model card asks for; it is editable in the sidebar too.
-    transformers_js_version: str = "4.3.2"
+    transformers_js_version: str = "4.3.2"  # tokenizer only in the WebGPU tab
+    ort_web_version: str = "1.30.0"  # onnxruntime-web, the version LiquidAI's tests/web pins
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -53,6 +52,7 @@ class Settings:
             max_new_tokens=int(_env("OMNI_MAX_NEW_TOKENS", "256")),
             data_dir=Path(_env("OMNI_DATA_DIR", "omni_data")),
             transformers_js_version=_env("OMNI_TRANSFORMERS_JS", "4.3.2"),
+            ort_web_version=_env("OMNI_ORT_WEB", "1.30.0"),
         )
 
     def resolve_engine(self) -> str:

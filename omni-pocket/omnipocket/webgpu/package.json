@@ -1,0 +1,1 @@
+{ "type": "module", "private": true, "description": "lets Node import lfm3omni.js as an ES module (tests/js)" }

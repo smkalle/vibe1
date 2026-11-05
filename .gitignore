@@ -19,3 +19,7 @@ uw-lens/.venv/
 kumo-relational-sqlite/kumo_work/
 kumo-relational-sqlite/.venv/
 kumo-relational-sqlite/.ipynb_checkpoints/
+
+# omni-pocket
+omni-pocket/omni_data/
+omni-pocket/.venv/

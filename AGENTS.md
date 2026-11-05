@@ -7,6 +7,7 @@ Several unrelated projects share this repo. Do not mix their deps or commands.
 - **`flysaver/`**: separate Rust screensaver (`Cargo.toml`). See `flysaver/README.md`.
 - **`uw-lens/`**: Streamlit multimodal health-doc search for underwriting (own `requirements.txt`, pytest suite). Spec `specs/uw-lens.md`.
 - **`kumo-relational-sqlite/`**: NVIDIA Kumo Relational notebook tutorial on SQLite (Olist data). No package, no tests.
+- **`omni-pocket/`**: Streamlit app for LiquidAI LFM3-Omni-2B on Android (Termux / UserLAnd Arch); own requirements, pytest suite.
 
 ## Root (LitServe + MCP)
 
@@ -51,3 +52,14 @@ Run everything from inside `uw-lens/`.
 - Offline check: `OLIST_SOURCE=synthetic jupyter nbconvert --to notebook --execute --output /tmp/out.ipynb kumo_relational_sqlite_tutorial.ipynb` (~2 min on CPU). With no NIM, Kumo cells print `skipped` and the baselines run. Needs `kumo-relational-client[relational,sqlite]`, scikit-learn, matplotlib.
 - SQLite hard rule: Python `sqlite3` must never open a file a Kumo graph uses. ADBC bundles its own SQLite, the sampler writes `tmp_*` scratch tables inside an open transaction during `predict()`, and in-process POSIX lock loss corrupts the file. The notebook keeps `olist.db` for SQL and `olist_kumo*.db` snapshots for Kumo. Build variant graphs on the same file only before the first `predict()`.
 - `check_pql()` uses the engine-internal `parse_query_locally` (engine 1.0.x). It is a linter only.
+
+## omni-pocket/
+
+Run everything from inside `omni-pocket/`.
+
+- Setup: `pip install -r requirements-dev.txt` (UI + pytest + fastapi; no torch). `requirements-local.txt` adds torch/transformers, `requirements-server.txt` adds the server. Phone installers: `scripts/install_termux.sh`, `scripts/install_userland_arch.sh`.
+- Offline check: `python -m pytest -q tests` (autouse fixture forces `OMNI_ENGINE=mock`, tmp `OMNI_DATA_DIR`, clears keys), or `scripts/smoke_test.sh` (adds a headless Streamlit boot).
+- Engines share `generate()` + `stream()` (`omnipocket/engines/`). `transformers_engine.py` is the only file tied to the model card API; it is untested against real weights. `serve.py` is an OpenAI-compatible server; `RemoteEngine` is its client (live round-trip in `tests/test_serve.py`).
+- `omnipocket/webgpu/index.html` is a hand-written bidirectional Streamlit component (raw postMessage protocol, no npm). Events: `probe`, `gpu_bench`, `model_loaded`, `answer`, `error`; `app.py` dedupes by `seq`.
+- Key hygiene: remote API key only in env or session memory; `Settings.remote_api_key` is repr=False, engine cache keyed on a hash.
+- Docs live in `guides/` (root `.gitignore` ignores any `docs/`).

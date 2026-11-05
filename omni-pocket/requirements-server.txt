@@ -1,0 +1,4 @@
+# OpenAI-compatible server for the remote engine (run on the GPU box).
+-r requirements-local.txt
+fastapi>=0.110
+uvicorn>=0.29
